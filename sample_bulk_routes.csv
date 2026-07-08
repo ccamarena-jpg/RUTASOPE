@@ -1,0 +1,4 @@
+date,hour,driver_name,account_name,project_name,destino,motivo
+2026-07-08,08:00,Christian Herrera,Alicorp,Distribucion Lima Norte,Almacen Chiclin,Carga inicial de pedidos
+2026-07-08,10:00,Christian Herrera,Alicorp,Reposicion Tiendas SJL,Cliente Alicorp - SJL,Entrega de pedido #4521
+2026-07-08,09:00,Luis Ramirez,Backus,Entrega Canal Moderno,Tienda Backus - Surco,Reposicion de stock

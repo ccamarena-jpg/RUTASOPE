@@ -1,0 +1,7 @@
+node_modules/
+client/dist/
+server/uploads/*
+!server/uploads/.gitkeep
+server/ruteo.db
+server/ruteo.db-*
+*.log
