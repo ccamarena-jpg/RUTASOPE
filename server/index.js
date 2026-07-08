@@ -4,6 +4,7 @@ const path = require('path');
 
 require('./db'); // init + seed
 
+const { UPLOAD_DIR } = require('./paths');
 const authRoutes = require('./routes/auth');
 const catalogRoutes = require('./routes/catalog');
 const routeRoutes = require('./routes/routes');
@@ -12,7 +13,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 

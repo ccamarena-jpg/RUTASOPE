@@ -1,8 +1,7 @@
-const path = require('path');
 const bcrypt = require('bcryptjs');
 const { DatabaseSync } = require('node:sqlite');
+const { DB_PATH } = require('./paths');
 
-const DB_PATH = path.join(__dirname, 'ruteo.db');
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');

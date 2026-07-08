@@ -1,0 +1,31 @@
+# Render Blueprint para Ruteo TT Audit.
+# Un solo servicio web que construye el cliente (React/Vite) y arranca el
+# servidor Express, que sirve tanto la API como la app web en un mismo puerto.
+#
+# La base de datos SQLite (ruteo.db) y las guias de remision subidas viven en
+# un disco persistente montado en /var/data, para que NO se borren en cada
+# despliegue. El disco requiere un plan de pago (starter). En plan gratuito,
+# elimina la seccion "disk" y quita DATA_DIR: la app funciona igual, pero los
+# datos se reinician cuando el servicio se reinicia.
+services:
+  - type: web
+    name: ruteo-tt-audit
+    runtime: node
+    plan: starter
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && npm start
+    healthCheckPath: /api/health
+    envVars:
+      # node:sqlite funciona sin flag desde Node 23.4+; usamos 24.
+      - key: NODE_VERSION
+        value: "24"
+      # Clave para firmar los tokens de sesion. Render genera un valor seguro.
+      - key: JWT_SECRET
+        generateValue: true
+      # Carpeta de datos persistentes (debe coincidir con el mountPath del disco).
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: ruteo-data
+      mountPath: /var/data
+      sizeGB: 1
