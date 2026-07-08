@@ -8,66 +8,40 @@ Plataforma web (con vista móvil responsive) para asignar choferes a rutas diari
 - **Chofer** (vista móvil): ve sus rutas del día, marca hora de salida y hora de llegada, escribe comentarios y adjunta la guía de remisión (foto o PDF) como cargo de entrega.
 - **Cuenta / Cliente**: ve únicamente las rutas de su cuenta y el estado se actualiza solo (cada 15 segundos) conforme el chofer marca avances — sin necesidad de refrescar.
 
-Roles con permisos separados (JWT): `admin`, `chofer`, `cuenta`.
+Roles con permisos separados (token firmado): `admin`, `chofer`, `cuenta`.
 
 ## Stack
 
-- Backend: Node.js + Express, base de datos SQLite (usa el módulo nativo `node:sqlite` de Node 22+, sin dependencias de compilación), autenticación JWT, subida de archivos con Multer, carga masiva de rutas vía CSV.
-- Frontend: React + Vite, responsive (funciona igual en celular, sin necesidad de instalar una app nativa).
+- **Backend: Google Apps Script** publicado como aplicación web. Los datos viven en una hoja de **Google Sheets** (una pestaña por "tabla") y las guías de remisión en **Google Drive**. Sin servidor propio, sin base de datos que administrar y **sin costo**. No requiere proyecto en Google Cloud ni cuenta de servicio.
+- **Frontend: React + Vite**, sitio estático responsive (funciona igual en celular, sin instalar una app nativa). Se despliega gratis en Vercel (o cualquier hosting estático).
 
-## Requisitos
+## Puesta en marcha
 
-- Node.js **22.5 o superior** (usa `node:sqlite`, revisa con `node -v`).
+### 1. Backend (Google Apps Script)
+Sigue la guía paso a paso en [`apps-script/README.md`](apps-script/README.md):
+crear la hoja → pegar `apps-script/Code.gs` → ejecutar `setup()` → publicar como
+aplicación web → copiar la URL `/exec`.
 
-## Instalación y ejecución (modo desarrollo)
-
-```bash
-# 1. Backend
-cd server
-npm install
-npm start          # http://localhost:4000
-
-# 2. Frontend (en otra terminal)
-cd client
-npm install
-npm run dev         # http://localhost:5173 (con proxy automático a la API)
-```
-
-Abre `http://localhost:5173` en tu navegador (o desde el celular usando la IP de tu compu en la misma red).
-
-## Ejecución en producción (un solo servidor)
+### 2. Frontend
+Necesita saber la URL del Web App mediante la variable `VITE_APPS_SCRIPT_URL`.
 
 ```bash
 cd client
 npm install
-npm run build        # genera client/dist
-
-cd ../server
-npm install
-npm start             # sirve la API y la app web en un solo puerto (4000)
+cp .env.example .env.local     # y pon dentro tu URL /exec
+npm run dev                     # http://localhost:5173
 ```
 
-Con esto, `http://localhost:4000` (o el dominio donde lo despliegues) sirve tanto la API como la aplicación web y móvil desde un único servidor. Para producción real, corre este servidor detrás de HTTPS (por ejemplo con un reverse proxy como Nginx o un hosting tipo Render/Railway/VPS) y cambia `JWT_SECRET` (ver abajo).
+> El frontend habla directo con el Web App de Apps Script (mismo comportamiento
+> en local y en producción). No hay servidor local que levantar.
 
-## Despliegue en Render
+### 3. Despliegue en Vercel (gratis)
+1. En [Vercel](https://vercel.com) → **Add New → Project**, importa este repo de GitHub.
+2. Vercel lee `vercel.json` (construye el cliente y sirve el sitio estático).
+3. En **Settings → Environment Variables** agrega `VITE_APPS_SCRIPT_URL` con tu URL `/exec`.
+4. **Deploy**. Tendrás una URL `https://...vercel.app` con HTTPS.
 
-El repo incluye `render.yaml` (Blueprint) que crea un único servicio web: construye el cliente y arranca el servidor, que sirve la API y la app web en el mismo puerto.
-
-1. En [Render](https://render.com) → **New** → **Blueprint**, conecta este repositorio de GitHub.
-2. Render lee `render.yaml` automáticamente. `JWT_SECRET` se genera solo y `PORT` lo asigna Render.
-3. Deploy. Al terminar tendrás una URL `https://ruteo-tt-audit.onrender.com` (o similar) con HTTPS.
-
-La base de datos SQLite y las guías de remisión se guardan en un **disco persistente** montado en `/var/data` (variable `DATA_DIR`), así **no se borran** en cada despliegue. El disco requiere un plan de pago (Starter). Si prefieres el plan gratuito para probar, elimina del `render.yaml` la sección `disk` y la variable `DATA_DIR`: la app funciona igual, pero los datos se reinician cuando el servicio se reinicia.
-
-> Nota: Vercel **no** sirve para esta app tal como está, porque usa un servidor de larga duración con SQLite en archivo y archivos subidos a disco (Vercel es serverless, sin disco persistente). Usa Render, Railway o un VPS.
-
-## Variables de entorno
-
-- `PORT`: puerto del servidor (lo asigna Render automáticamente; default local 4000).
-- `JWT_SECRET`: clave para firmar tokens de sesión. **Cambiar en producción.**
-- `DATA_DIR`: carpeta de datos persistentes (base de datos + uploads). Si no se define, se usa la carpeta del servidor (comportamiento local de siempre).
-
-## Usuarios de prueba (datos semilla)
+## Usuarios de prueba (creados por `setup()`)
 
 | Rol     | Correo                          | Contraseña  |
 |---------|----------------------------------|-------------|
@@ -77,38 +51,41 @@ La base de datos SQLite y las guías de remisión se guardan en un **disco persi
 | Cuenta  | cuenta.alicorp@cliente.com       | cuenta123   |
 | Cuenta  | cuenta.backus@cliente.com        | cuenta123   |
 
-La base de datos (`server/ruteo.db`) se crea y llena automáticamente con datos de ejemplo (choferes, cuentas, proyectos y algunas rutas) la primera vez que corres el servidor. Para reiniciar los datos, borra ese archivo y vuelve a correr `npm start`.
+Las contraseñas se guardan con hash SHA-256 + sal en la hoja `users`.
 
 ## Carga masiva de rutas (CSV)
 
-Desde el panel de administrador, en "Calendario semanal" > "Carga masiva (CSV)", puedes descargar la plantilla y subir un archivo con estas columnas:
+Desde el panel de administrador, en "Calendario semanal" > "Carga masiva (CSV)", puedes subir un archivo con estas columnas:
 
 ```
 date,hour,driver_name,account_name,project_name,destino,motivo
 ```
 
-También puedes usar `driver_id` / `account_id` / `project_id` en vez de los nombres si ya conoces los IDs. Ver `sample_bulk_routes.csv` en la raíz del proyecto como ejemplo.
+También puedes usar `driver_id` / `account_id` / `project_id` en vez de los nombres si ya conoces los IDs. Ver `sample_bulk_routes.csv` como ejemplo.
 
 ## Estructura del proyecto
 
 ```
 ruteo-app/
-├── server/            API (Express + SQLite)
-│   ├── db.js          Esquema y datos semilla
-│   ├── index.js        Punto de entrada del servidor
-│   ├── middleware/      Autenticación JWT y control de roles
-│   ├── routes/          Endpoints: auth, catálogo (choferes/cuentas/proyectos), rutas
-│   └── uploads/         Archivos de guías de remisión subidos por choferes
+├── apps-script/       Backend (Google Apps Script)
+│   ├── Code.gs        API completa: auth, catálogo, rutas, subida de guías
+│   └── README.md      Guía de instalación y publicación del Web App
 ├── client/            Aplicación web (React + Vite)
 │   └── src/
-│       ├── pages/        Login, AdminDashboard, DriverView, AccountView
-│       ├── components/   Calendario semanal, formularios, carga masiva
-│       └── utils/        Utilidades de fecha
+│       ├── pages/       Login, AdminDashboard, DriverView, AccountView
+│       ├── components/  Calendario semanal, formularios, carga masiva, resumen
+│       ├── utils/       Utilidades de fecha y CSV
+│       └── api.js       Cliente que habla con el Web App de Apps Script
+├── vercel.json        Configuración de despliegue estático en Vercel
 └── sample_bulk_routes.csv
 ```
+
+> `server/` contiene el backend anterior (Express + SQLite). Quedó como
+> referencia/legado; **no se usa** con la arquitectura de Google Apps Script.
 
 ## Limitaciones y siguientes pasos sugeridos
 
 - No incluye notificaciones push; el estado se actualiza por sondeo (polling) cada 15 segundos, suficiente para uso diario pero no instantáneo al 100%.
-- No es una app nativa de tienda (App Store / Play Store); es una web responsive que los choferes pueden abrir desde el navegador del celular y, si quieren, "agregar a inicio" como acceso directo.
-- Para producción real conviene: usar HTTPS, mover `JWT_SECRET` a variable de entorno segura, agregar respaldo/backup de la base de datos y considerar un almacenamiento externo (S3 o similar) para las guías de remisión si el volumen crece.
+- No es una app nativa de tienda; es una web responsive que los choferes abren desde el navegador del celular y pueden "agregar a inicio" como acceso directo.
+- Apps Script tiene cuotas diarias (ejecuciones y tiempo); para el volumen de ruteo diario son más que suficientes.
+- Falta una pantalla de cambio de contraseña dentro de la app (por ahora se cambian editando el `password_hash` en la hoja).

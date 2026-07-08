@@ -1,4 +1,12 @@
-const BASE = '/api';
+// Cliente de la API. El backend es un Web App de Google Apps Script
+// (ver apps-script/Code.gs). Todas las llamadas van por POST con
+// Content-Type text/plain para que el navegador NO haga preflight de CORS.
+//
+// Pon la URL del Web App aqui, o definela como VITE_APPS_SCRIPT_URL en las
+// variables de entorno (recomendado en Vercel). La de entorno tiene prioridad.
+const APPS_SCRIPT_URL =
+  (import.meta.env && import.meta.env.VITE_APPS_SCRIPT_URL) ||
+  'PEGA_AQUI_LA_URL_DEL_WEB_APP';
 
 function getToken() {
   return localStorage.getItem('ruteo_token');
@@ -19,61 +27,75 @@ export function clearSession() {
   localStorage.removeItem('ruteo_user');
 }
 
-async function request(path, { method = 'GET', body, isForm = false } = {}) {
-  const headers = {};
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (!isForm && body) headers['Content-Type'] = 'application/json';
-
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: isForm ? body : body ? JSON.stringify(body) : undefined,
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const s = String(reader.result);
+      const i = s.indexOf(',');
+      resolve(i >= 0 ? s.slice(i + 1) : s);
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.readAsDataURL(file);
   });
+}
 
-  let data = null;
-  try { data = await res.json(); } catch (e) { /* no body */ }
-
-  if (!res.ok) {
-    const message = (data && data.error) || `Error ${res.status}`;
-    throw new Error(message);
+async function call(path, { method = 'GET', body = null, query = null, file = null } = {}) {
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'PEGA_AQUI_LA_URL_DEL_WEB_APP') {
+    throw new Error('Falta configurar la URL del Web App (VITE_APPS_SCRIPT_URL).');
   }
-  return data;
+
+  const envelope = { path, method, token: getToken() || '', query: query || {}, body: body || {} };
+  if (file) {
+    const dataBase64 = await fileToBase64(file);
+    envelope.body = { ...(body || {}), file: { name: file.name, mimeType: file.type || 'application/octet-stream', dataBase64 } };
+  }
+
+  let res;
+  try {
+    res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(envelope),
+      redirect: 'follow',
+    });
+  } catch (e) {
+    throw new Error('No se pudo conectar con el servidor. Revisa la URL del Web App y tu conexion.');
+  }
+
+  let payload = null;
+  try { payload = await res.json(); } catch (e) { /* respuesta no JSON */ }
+
+  if (!payload || payload.ok === false) {
+    const err = new Error((payload && payload.error) || `Error ${(payload && payload.status) || res.status}`);
+    err.status = payload && payload.status;
+    throw err;
+  }
+  return payload.data;
 }
 
 export const api = {
-  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  login: (email, password) => call('/auth/login', { method: 'POST', body: { email, password } }),
 
-  getDrivers: () => request('/drivers'),
-  createDriver: (payload) => request('/drivers', { method: 'POST', body: payload }),
-  updateDriver: (id, payload) => request(`/drivers/${id}`, { method: 'PUT', body: payload }),
+  getDrivers: () => call('/drivers'),
+  createDriver: (payload) => call('/drivers', { method: 'POST', body: payload }),
+  updateDriver: (id, payload) => call(`/drivers/${id}`, { method: 'PUT', body: payload }),
 
-  getAccounts: () => request('/accounts'),
-  createAccount: (payload) => request('/accounts', { method: 'POST', body: payload }),
+  getAccounts: () => call('/accounts'),
+  createAccount: (payload) => call('/accounts', { method: 'POST', body: payload }),
 
-  getProjects: (accountId) => request(`/projects${accountId ? `?account_id=${accountId}` : ''}`),
-  createProject: (payload) => request('/projects', { method: 'POST', body: payload }),
+  getProjects: (accountId) => call('/projects', { query: accountId ? { account_id: accountId } : {} }),
+  createProject: (payload) => call('/projects', { method: 'POST', body: payload }),
 
-  getRoutes: (params = {}) => {
-    const qs = new URLSearchParams(params).toString();
-    return request(`/routes${qs ? `?${qs}` : ''}`);
-  },
-  createRoute: (payload) => request('/routes', { method: 'POST', body: payload }),
-  updateRoute: (id, payload) => request(`/routes/${id}`, { method: 'PUT', body: payload }),
-  deleteRoute: (id) => request(`/routes/${id}`, { method: 'DELETE' }),
-  bulkUpload: (file) => {
-    const form = new FormData();
-    form.append('file', file);
-    return request('/routes/bulk', { method: 'POST', body: form, isForm: true });
-  },
+  getRoutes: (params = {}) => call('/routes', { query: params }),
+  createRoute: (payload) => call('/routes', { method: 'POST', body: payload }),
+  updateRoute: (id, payload) => call(`/routes/${id}`, { method: 'PUT', body: payload }),
+  deleteRoute: (id) => call(`/routes/${id}`, { method: 'DELETE' }),
+  bulkUpload: (file) => call('/routes/bulk', { method: 'POST', file }),
 
-  driverSalida: (id, hora) => request(`/routes/${id}/salida`, { method: 'POST', body: { hora } }),
-  driverLlegada: (id, hora) => request(`/routes/${id}/llegada`, { method: 'POST', body: { hora } }),
-  driverComentario: (id, comentario) => request(`/routes/${id}/comentario`, { method: 'POST', body: { comentario } }),
-  driverNoRealizada: (id, motivo) => request(`/routes/${id}/no-realizada`, { method: 'POST', body: { motivo } }),
-  driverGuia: (id, file) => {
-    const form = new FormData();
-    form.append('guia', file);
-    return request(`/routes/${id}/guia`, { method: 'POST', body: form, isForm: true });
-  },
+  driverSalida: (id, hora) => call(`/routes/${id}/salida`, { method: 'POST', body: { hora } }),
+  driverLlegada: (id, hora) => call(`/routes/${id}/llegada`, { method: 'POST', body: { hora } }),
+  driverComentario: (id, comentario) => call(`/routes/${id}/comentario`, { method: 'POST', body: { comentario } }),
+  driverNoRealizada: (id, motivo) => call(`/routes/${id}/no-realizada`, { method: 'POST', body: { motivo } }),
+  driverGuia: (id, file) => call(`/routes/${id}/guia`, { method: 'POST', file }),
 };
