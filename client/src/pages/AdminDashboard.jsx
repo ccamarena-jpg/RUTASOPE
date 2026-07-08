@@ -3,7 +3,9 @@ import { api } from '../api';
 import WeeklyCalendar from '../components/WeeklyCalendar.jsx';
 import RouteFormModal from '../components/RouteFormModal.jsx';
 import BulkUploadModal from '../components/BulkUploadModal.jsx';
+import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
+import { downloadRoutesCsv } from '../utils/csv';
 
 const TABS = [
   { id: 'calendar', label: 'Calendario semanal' },
@@ -101,12 +103,16 @@ function CalendarTab({ drivers, accounts }) {
   );
 }
 
-const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado' };
+const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
 function TodayTab() {
   const [date, setDate] = useState(toISODate(new Date()));
   const [routes, setRoutes] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [search, setSearch] = useState('');
+  const [driverFilter, setDriverFilter] = useState('todos');
+  const [accountFilter, setAccountFilter] = useState('todos');
+  const [statusFilter, setStatusFilter] = useState('todos');
 
   const load = useCallback(() => {
     api.getRoutes({ date }).then((r) => { setRoutes(r); setLastUpdated(new Date()); }).catch(() => {});
@@ -118,6 +124,27 @@ function TodayTab() {
     return () => clearInterval(id);
   }, [load]);
 
+  const driverNames = useMemo(() => [...new Set(routes.map((r) => r.driver_name))].sort(), [routes]);
+  const accountNames = useMemo(() => [...new Set(routes.map((r) => r.account_name))].sort(), [routes]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return routes.filter((r) => {
+      if (driverFilter !== 'todos' && r.driver_name !== driverFilter) return false;
+      if (accountFilter !== 'todos' && r.account_name !== accountFilter) return false;
+      if (statusFilter !== 'todos' && r.status !== statusFilter) return false;
+      if (q) {
+        const hay = `${r.destino} ${r.motivo || ''} ${r.driver_name} ${r.account_name} ${r.project_name || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [routes, search, driverFilter, accountFilter, statusFilter]);
+
+  function exportCsv() {
+    downloadRoutesCsv(visible, `rutas_${date}.csv`);
+  }
+
   return (
     <div className="card">
       <div className="card-header">
@@ -125,11 +152,40 @@ function TodayTab() {
         <div className="toolbar">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <button className="btn btn-secondary" onClick={load}>Actualizar</button>
+          <button className="btn btn-secondary" onClick={exportCsv} disabled={visible.length === 0}>⬇ Exportar CSV</button>
           {lastUpdated && <span style={{ fontSize: 12, color: '#889' }}>Actualizado {lastUpdated.toLocaleTimeString()}</span>}
         </div>
       </div>
-      {routes.length === 0 ? (
-        <div className="empty-state">No hay rutas programadas para esta fecha.</div>
+
+      <StatusSummary routes={routes} />
+
+      <div className="toolbar filters-row">
+        <input
+          type="search"
+          placeholder="Buscar destino, motivo, chofer..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ minWidth: 220, flex: 1 }}
+        />
+        <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)}>
+          <option value="todos">Todos los choferes</option>
+          {driverNames.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}>
+          <option value="todos">Todas las cuentas</option>
+          {accountNames.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="todos">Todos los estados</option>
+          <option value="pendiente">Pendiente</option>
+          <option value="en_curso">En curso</option>
+          <option value="completado">Completado</option>
+          <option value="no_realizada">No realizada</option>
+        </select>
+      </div>
+
+      {visible.length === 0 ? (
+        <div className="empty-state">{routes.length === 0 ? 'No hay rutas programadas para esta fecha.' : 'Ninguna ruta coincide con los filtros.'}</div>
       ) : (
         <table className="simple">
           <thead>
@@ -138,12 +194,13 @@ function TodayTab() {
             </tr>
           </thead>
           <tbody>
-            {routes.map((r) => (
+            {visible.map((r) => (
               <tr key={r.id}>
                 <td>{r.hour}</td>
                 <td>{r.driver_name}</td>
                 <td>{r.account_name}{r.project_name ? ` / ${r.project_name}` : ''}</td>
-                <td>{r.destino}{r.motivo ? <div style={{ color: '#889', fontSize: 12 }}>{r.motivo}</div> : null}</td>
+                <td>{r.destino}{r.motivo ? <div style={{ color: '#889', fontSize: 12 }}>{r.motivo}</div> : null}
+                  {r.status === 'no_realizada' && r.motivo_no_realizada ? <div style={{ color: 'var(--red)', fontSize: 12 }}>No realizada: {r.motivo_no_realizada}</div> : null}</td>
                 <td><span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
                 <td>{r.hora_salida || '-'}</td>
                 <td>{r.hora_llegada || '-'}</td>

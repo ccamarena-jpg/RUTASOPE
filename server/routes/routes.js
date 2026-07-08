@@ -181,6 +181,17 @@ router.post('/:id/llegada', requireRole('chofer'), (req, res) => {
   res.json(db.prepare(`${SELECT_JOIN} WHERE r.id = ?`).get(req.params.id));
 });
 
+// Chofer marks route as no realizada (not completed) with a reason
+router.post('/:id/no-realizada', requireRole('chofer'), (req, res) => {
+  const route = ensureOwnRoute(req, res);
+  if (!route) return;
+  const motivo = (req.body.motivo || '').trim();
+  if (!motivo) return res.status(400).json({ error: 'Debes indicar el motivo por el que no se realizo' });
+  db.prepare(`UPDATE routes SET status = 'no_realizada', motivo_no_realizada = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .run(motivo, req.params.id);
+  res.json(db.prepare(`${SELECT_JOIN} WHERE r.id = ?`).get(req.params.id));
+});
+
 // Chofer adds/updates comentario
 router.post('/:id/comentario', requireRole('chofer'), (req, res) => {
   const route = ensureOwnRoute(req, res);
