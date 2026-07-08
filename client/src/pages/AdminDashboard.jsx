@@ -25,6 +25,10 @@ export default function AdminDashboard() {
 
   return (
     <div>
+      <div className="page-head">
+        <h1>Panel de administracion</h1>
+        <p>Asigna choferes, carga rutas diarias y da seguimiento en tiempo real.</p>
+      </div>
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
@@ -66,7 +70,7 @@ function CalendarTab({ drivers, accounts }) {
   return (
     <div>
       <div className="card-header">
-        <h2 style={{ fontSize: 16 }}>Asignacion de rutas diarias</h2>
+        <h2 style={{ fontSize: 17 }}>🗺️ Asignacion de rutas diarias</h2>
         <div className="toolbar">
           <button className="btn btn-secondary" onClick={() => setShowBulk(true)}>Carga masiva (CSV)</button>
           <button className="btn btn-primary" onClick={() => setModalState({ initial: { date: toISODate(new Date()), driver_id: driverId } })}>+ Nueva ruta</button>
@@ -117,7 +121,7 @@ function TodayTab() {
   return (
     <div className="card">
       <div className="card-header">
-        <h3>Rutas del dia</h3>
+        <h3>🕒 Rutas del dia (en vivo)</h3>
         <div className="toolbar">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <button className="btn btn-secondary" onClick={load}>Actualizar</button>
@@ -181,7 +185,7 @@ function DriversPanel({ drivers, onChange }) {
 
   return (
     <div className="card">
-      <div className="card-header"><h3>Choferes</h3></div>
+      <div className="card-header"><h3>🚚 Choferes</h3></div>
       {error && <div className="error-msg">{error}</div>}
       <table className="simple" style={{ marginBottom: 14 }}>
         <thead><tr><th>Nombre</th><th>Telefono</th><th>Vehiculo</th><th>Supervisor</th></tr></thead>
@@ -236,7 +240,7 @@ function AccountsPanel({ accounts, onChange }) {
 
   return (
     <div className="card">
-      <div className="card-header"><h3>Cuentas y proyectos</h3></div>
+      <div className="card-header"><h3>🏢 Cuentas y proyectos</h3></div>
       {error && <div className="error-msg">{error}</div>}
       <table className="simple" style={{ marginBottom: 14 }}>
         <thead><tr><th>Cuenta</th></tr></thead>

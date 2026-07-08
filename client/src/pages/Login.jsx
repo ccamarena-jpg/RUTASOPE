@@ -36,6 +36,7 @@ export default function Login() {
   return (
     <div className="login-wrap">
       <div className="login-card">
+        <div className="login-logo">TT</div>
         <h1>Ruteo TT Audit</h1>
         <p className="subtitle">Asignacion y seguimiento de rutas diarias</p>
         {error && <div className="error-msg">{error}</div>}

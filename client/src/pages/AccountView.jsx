@@ -23,9 +23,14 @@ export default function AccountView() {
   const visible = statusFilter === 'todos' ? routes : routes.filter((r) => r.status === statusFilter);
 
   return (
-    <div className="card">
+    <div>
+      <div className="page-head">
+        <h1>Seguimiento de entregas</h1>
+        <p>Estado de tus rutas en tiempo real. Se actualiza automaticamente cada 15 segundos.</p>
+      </div>
+      <div className="card">
       <div className="card-header">
-        <h2 style={{ fontSize: 16 }}>Seguimiento de rutas en tiempo real</h2>
+        <h2 style={{ fontSize: 17 }}>📍 Rutas en tiempo real</h2>
         <div className="toolbar">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -63,6 +68,7 @@ export default function AccountView() {
           </div>
         ))
       )}
+      </div>
     </div>
   );
 }
