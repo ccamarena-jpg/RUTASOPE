@@ -1,8 +1,7 @@
-const path = require('path');
 const bcrypt = require('bcryptjs');
 const { DatabaseSync } = require('node:sqlite');
+const { DB_PATH } = require('./paths');
 
-const DB_PATH = path.join(__dirname, 'ruteo.db');
 const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
@@ -48,10 +47,11 @@ function init() {
       project_id INTEGER REFERENCES projects(id),
       destino TEXT NOT NULL,
       motivo TEXT,
-      status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente','en_curso','completado')),
+      status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente','en_curso','completado','no_realizada')),
       hora_salida TEXT,
       hora_llegada TEXT,
       comentario_chofer TEXT,
+      motivo_no_realizada TEXT,
       guia_remision_filename TEXT,
       created_by TEXT,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -62,9 +62,67 @@ function init() {
     CREATE INDEX IF NOT EXISTS idx_routes_account ON routes(account_id);
   `);
 
+  migrate();
+
   const userCount = db.prepare('SELECT COUNT(*) c FROM users').get().c;
   if (userCount === 0) {
     seed();
+  }
+}
+
+// Bring an already-existing routes table (created before the 'no_realizada'
+// status / motivo column existed) up to the current schema. Idempotent: on a
+// fresh DB the CREATE above already matches, so this is a no-op.
+function migrate() {
+  const tableSql = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='routes'"
+  ).get()?.sql || '';
+
+  if (tableSql.includes('no_realizada')) return; // already migrated
+
+  // SQLite can't ALTER a CHECK constraint, so rebuild the table. Copy the old
+  // columns over; motivo_no_realizada defaults to NULL for existing rows.
+  db.exec('PRAGMA foreign_keys = OFF;');
+  db.exec('BEGIN');
+  try {
+    db.exec(`
+      CREATE TABLE routes_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        hour TEXT NOT NULL,
+        driver_id INTEGER NOT NULL REFERENCES drivers(id),
+        account_id INTEGER NOT NULL REFERENCES accounts(id),
+        project_id INTEGER REFERENCES projects(id),
+        destino TEXT NOT NULL,
+        motivo TEXT,
+        status TEXT NOT NULL DEFAULT 'pendiente' CHECK(status IN ('pendiente','en_curso','completado','no_realizada')),
+        hora_salida TEXT,
+        hora_llegada TEXT,
+        comentario_chofer TEXT,
+        motivo_no_realizada TEXT,
+        guia_remision_filename TEXT,
+        created_by TEXT,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO routes_new
+        (id, date, hour, driver_id, account_id, project_id, destino, motivo, status,
+         hora_salida, hora_llegada, comentario_chofer, guia_remision_filename, created_by, updated_at)
+      SELECT
+         id, date, hour, driver_id, account_id, project_id, destino, motivo, status,
+         hora_salida, hora_llegada, comentario_chofer, guia_remision_filename, created_by, updated_at
+      FROM routes;
+      DROP TABLE routes;
+      ALTER TABLE routes_new RENAME TO routes;
+      CREATE INDEX IF NOT EXISTS idx_routes_date ON routes(date);
+      CREATE INDEX IF NOT EXISTS idx_routes_driver ON routes(driver_id);
+      CREATE INDEX IF NOT EXISTS idx_routes_account ON routes(account_id);
+    `);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON;');
   }
 }
 

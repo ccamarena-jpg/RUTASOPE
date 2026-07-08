@@ -1,5 +1,8 @@
 node_modules/
 client/dist/
+.env
+.env.local
+.vercel
 server/uploads/*
 !server/uploads/.gitkeep
 server/ruteo.db

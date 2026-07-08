@@ -49,10 +49,23 @@ npm start             # sirve la API y la app web en un solo puerto (4000)
 
 Con esto, `http://localhost:4000` (o el dominio donde lo despliegues) sirve tanto la API como la aplicación web y móvil desde un único servidor. Para producción real, corre este servidor detrás de HTTPS (por ejemplo con un reverse proxy como Nginx o un hosting tipo Render/Railway/VPS) y cambia `JWT_SECRET` (ver abajo).
 
+## Despliegue en Render
+
+El repo incluye `render.yaml` (Blueprint) que crea un único servicio web: construye el cliente y arranca el servidor, que sirve la API y la app web en el mismo puerto.
+
+1. En [Render](https://render.com) → **New** → **Blueprint**, conecta este repositorio de GitHub.
+2. Render lee `render.yaml` automáticamente. `JWT_SECRET` se genera solo y `PORT` lo asigna Render.
+3. Deploy. Al terminar tendrás una URL `https://ruteo-tt-audit.onrender.com` (o similar) con HTTPS.
+
+La base de datos SQLite y las guías de remisión se guardan en un **disco persistente** montado en `/var/data` (variable `DATA_DIR`), así **no se borran** en cada despliegue. El disco requiere un plan de pago (Starter). Si prefieres el plan gratuito para probar, elimina del `render.yaml` la sección `disk` y la variable `DATA_DIR`: la app funciona igual, pero los datos se reinician cuando el servicio se reinicia.
+
+> Nota: Vercel **no** sirve para esta app tal como está, porque usa un servidor de larga duración con SQLite en archivo y archivos subidos a disco (Vercel es serverless, sin disco persistente). Usa Render, Railway o un VPS.
+
 ## Variables de entorno
 
-- `PORT`: puerto del servidor (default 4000).
+- `PORT`: puerto del servidor (lo asigna Render automáticamente; default local 4000).
 - `JWT_SECRET`: clave para firmar tokens de sesión. **Cambiar en producción.**
+- `DATA_DIR`: carpeta de datos persistentes (base de datos + uploads). Si no se define, se usa la carpeta del servidor (comportamiento local de siempre).
 
 ## Usuarios de prueba (datos semilla)
 

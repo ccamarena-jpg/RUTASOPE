@@ -1,0 +1,26 @@
+{
+  "name": "ruteo-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ruteo TT Audit - API serverless (Vercel) con Google Sheets + Drive",
+  "scripts": {
+    "dev:api": "node dev.js",
+    "seed": "node scripts/seed-sheets.js",
+    "build": "cd client && npm install && npm run build"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "express": "^4.19.2",
+    "googleapis": "^144.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

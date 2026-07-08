@@ -70,6 +70,7 @@ export const api = {
   driverSalida: (id, hora) => request(`/routes/${id}/salida`, { method: 'POST', body: { hora } }),
   driverLlegada: (id, hora) => request(`/routes/${id}/llegada`, { method: 'POST', body: { hora } }),
   driverComentario: (id, comentario) => request(`/routes/${id}/comentario`, { method: 'POST', body: { comentario } }),
+  driverNoRealizada: (id, motivo) => request(`/routes/${id}/no-realizada`, { method: 'POST', body: { motivo } }),
   driverGuia: (id, file) => {
     const form = new FormData();
     form.append('guia', file);

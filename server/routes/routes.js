@@ -1,16 +1,12 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { parse } = require('csv-parse/sync');
 const db = require('../db');
+const { UPLOAD_DIR } = require('../paths');
 const { authRequired, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(authRequired);
-
-const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
@@ -178,6 +174,17 @@ router.post('/:id/llegada', requireRole('chofer'), (req, res) => {
   if (!route) return;
   const hora = req.body.hora || new Date().toTimeString().slice(0, 5);
   db.prepare(`UPDATE routes SET hora_llegada = ?, status = 'completado', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(hora, req.params.id);
+  res.json(db.prepare(`${SELECT_JOIN} WHERE r.id = ?`).get(req.params.id));
+});
+
+// Chofer marks route as no realizada (not completed) with a reason
+router.post('/:id/no-realizada', requireRole('chofer'), (req, res) => {
+  const route = ensureOwnRoute(req, res);
+  if (!route) return;
+  const motivo = (req.body.motivo || '').trim();
+  if (!motivo) return res.status(400).json({ error: 'Debes indicar el motivo por el que no se realizo' });
+  db.prepare(`UPDATE routes SET status = 'no_realizada', motivo_no_realizada = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+    .run(motivo, req.params.id);
   res.json(db.prepare(`${SELECT_JOIN} WHERE r.id = ?`).get(req.params.id));
 });
 
