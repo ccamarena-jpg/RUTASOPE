@@ -30,7 +30,7 @@ var CONFIG = {
   // ID de cliente OAuth de Google para "Iniciar sesion con Google" (personal
   // TT Audit). Se crea una vez en la Consola de Google (ver apps-script/README).
   // Debe ser el MISMO que uses en el frontend (VITE_GOOGLE_CLIENT_ID).
-  GOOGLE_CLIENT_ID: '',
+  GOOGLE_CLIENT_ID: '850065266017-3tvj9u512flo9dbfpk88gnn3mofbtt8s.apps.googleusercontent.com',
 };
 
 // Orden de columnas por pestana (fila 1 = encabezados).
