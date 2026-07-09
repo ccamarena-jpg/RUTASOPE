@@ -6,7 +6,7 @@
 // variables de entorno (recomendado en Vercel). La de entorno tiene prioridad.
 const APPS_SCRIPT_URL =
   (import.meta.env && import.meta.env.VITE_APPS_SCRIPT_URL) ||
-  'PEGA_AQUI_LA_URL_DEL_WEB_APP';
+  'https://script.google.com/macros/s/AKfycbxvLT7giDNxKdqlcLbtKCoh90StW4RpiWnH2tuTdbqVFcmsYBjW8kCzJvcmSuFHv5OP/exec';
 
 function getToken() {
   return localStorage.getItem('ruteo_token');

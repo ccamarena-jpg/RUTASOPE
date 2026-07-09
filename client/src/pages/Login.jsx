@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, setSession, getUser } from '../api';
 
-const GOOGLE_CLIENT_ID = (import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID) || '';
+const GOOGLE_CLIENT_ID = (import.meta.env && import.meta.env.VITE_GOOGLE_CLIENT_ID) || '850065266017-3tvj9u512flo9dbfpk88gnn3mofbtt8s.apps.googleusercontent.com';
 
 function loadGis() {
   return new Promise((resolve, reject) => {
