@@ -38,20 +38,16 @@ npm run dev                     # http://localhost:5173
 ### 3. Despliegue en Vercel (gratis)
 1. En [Vercel](https://vercel.com) → **Add New → Project**, importa este repo de GitHub.
 2. Vercel lee `vercel.json` (construye el cliente y sirve el sitio estático).
-3. En **Settings → Environment Variables** agrega `VITE_APPS_SCRIPT_URL` con tu URL `/exec`.
+3. En **Settings → Environment Variables** agrega `VITE_APPS_SCRIPT_URL` (URL `/exec`) y `VITE_GOOGLE_CLIENT_ID` (para el login con Google).
 4. **Deploy**. Tendrás una URL `https://...vercel.app` con HTTPS.
 
-## Usuarios de prueba (creados por `setup()`)
+## Usuarios y roles
 
-| Rol     | Correo                          | Contraseña  |
-|---------|----------------------------------|-------------|
-| Admin   | admin@ttaudit.com                | admin123    |
-| Chofer  | christian.herrera@ttaudit.com    | chofer123   |
-| Chofer  | luis.ramirez@ttaudit.com         | chofer123   |
-| Cuenta  | cuenta.alicorp@cliente.com       | cuenta123   |
-| Cuenta  | cuenta.backus@cliente.com        | cuenta123   |
+- **Admin** (acceso total, asigna rutas) — entra con **Google**: `ccamarena@ttaudit.com`, `logistica@palmera.pe`, `epezo@ttaudit.com`, `botero@ttaudit.com`, `rgallo@ttaudit.com`, `operaciones@ttaudit.com`.
+- **Responsable de cuenta** (crea proyectos, ve el seguimiento) — entra con **Google**: `rpulido@ttaudit.com`, `dolaguibel@ttaudit.com`, `mcarhuallanqui@ttaudit.com`, `ghidalgo@ttaudit.com`.
+- **Chofer** (marca rutas, sube guías) — entra con **correo + contraseña**: `cris@ttaudit.com` / `Cris`.
 
-Las contraseñas se guardan con hash SHA-256 + sal en la hoja `users`.
+La lista se administra en `userDirectory()` dentro de `apps-script/Code.gs`: edítala y ejecuta `syncUsers()`. Las contraseñas se guardan con hash SHA-256 + sal en la hoja `users`. El login con Google se configura con un ID de cliente OAuth (ver [`apps-script/README.md`](apps-script/README.md)).
 
 ## Carga masiva de rutas (CSV)
 

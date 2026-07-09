@@ -45,6 +45,30 @@ aplicación web. Es gratis.
 > implementaciones**, edita la existente (lápiz) y sube la versión a **Nueva
 > versión**. Así la URL **no cambia**.
 
+### 4b. Iniciar sesión con Google (para el personal TT Audit)
+
+El personal (admins y responsables de cuenta) entra con **"Continuar con
+Google"**. Para eso necesitas crear **una vez** un ID de cliente OAuth (gratis,
+sin llaves, sin costo):
+
+1. Entra a https://console.cloud.google.com y crea (o elige) un proyecto.
+2. Menú **APIs y servicios → Pantalla de consentimiento OAuth**: configúrala
+   (tipo *Interno* si todos son de tu Workspace, o *Externo*). Pon el nombre de
+   la app y tu correo de soporte.
+3. **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de
+   OAuth → Aplicación web**.
+4. En **Orígenes autorizados de JavaScript** agrega las URLs desde donde se abre
+   la app (sin barra final), por ejemplo:
+   - `http://localhost:5173` (desarrollo)
+   - `https://tu-app.vercel.app` (producción)
+5. Crea y copia el **ID de cliente** (`....apps.googleusercontent.com`).
+6. Pégalo en **dos** lugares con el MISMO valor:
+   - Backend: `CONFIG.GOOGLE_CLIENT_ID` en `Code.gs` (y vuelve a publicar una
+     nueva versión).
+   - Frontend: variable `VITE_GOOGLE_CLIENT_ID` (en Vercel o en `.env.local`).
+
+> Los choferes no usan Google: entran con correo y contraseña.
+
 ### 5. Conectar el frontend
 Pon esa URL `/exec` en el frontend, de una de estas dos formas:
 
@@ -59,13 +83,23 @@ Para desarrollo local, crea `client/.env.local` con:
 VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/XXXX/exec
 ```
 
-## Usuarios de prueba (creados por `setup`)
+## Usuarios (creados por `setup` / `syncUsers`)
 
-| Rol    | Correo                        | Contraseña |
-|--------|-------------------------------|------------|
-| Admin  | admin@ttaudit.com             | admin123   |
-| Chofer | christian.herrera@ttaudit.com | chofer123  |
-| Cuenta | cuenta.alicorp@cliente.com    | cuenta123  |
+Los usuarios reales viven en la función `userDirectory()` dentro de `Code.gs`.
+Para **agregar o cambiar** usuarios: edita esa lista y ejecuta la función
+**`syncUsers`** desde el editor (agrega los que falten y actualiza rol/chofer,
+sin borrar los existentes).
+
+| Rol    | Entra con        | Correos |
+|--------|------------------|---------|
+| Admin  | Google           | ccamarena@ttaudit.com, logistica@palmera.pe, epezo@ttaudit.com, botero@ttaudit.com, rgallo@ttaudit.com, operaciones@ttaudit.com |
+| Cuenta | Google           | rpulido@ttaudit.com, dolaguibel@ttaudit.com, mcarhuallanqui@ttaudit.com, ghidalgo@ttaudit.com |
+| Chofer | Correo + clave   | cris@ttaudit.com / `Cris` |
+
+- **Admin**: acceso total; asigna rutas.
+- **Cuenta** (responsable): crea proyectos para cualquier cuenta y ve el
+  seguimiento en tiempo real.
+- **Chofer**: ve sus rutas, marca salida/llegada y sube la guía de remisión.
 
 ## Notas
 - **Seguridad de contraseñas:** se guardan con hash SHA-256 + sal (no en texto

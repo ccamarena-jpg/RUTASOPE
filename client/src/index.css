@@ -212,6 +212,12 @@ input, select, textarea {
 .login-card h1 { font-family: var(--serif); margin: 0 0 4px; font-size: 24px; color: var(--navy); }
 .login-card p.subtitle { margin: 0 0 22px; color: var(--text-soft); font-size: 13.5px; }
 
+.google-signin { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.google-signin .gis-hint { font-size: 12px; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.login-divider { display: flex; align-items: center; text-align: center; color: var(--text-soft); font-size: 12px; margin: 18px 0; }
+.login-divider::before, .login-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.login-divider span { padding: 0 10px; }
+
 .field { margin-bottom: 15px; }
 .field label { display: block; font-size: 13px; margin-bottom: 5px; color: var(--text-soft); font-weight: 600; }
 .field input, .field select, .field textarea {

@@ -27,6 +27,10 @@ var CONFIG = {
   JWT_SECRET: 'cambia-esto-por-una-cadena-larga-y-aleatoria',
   // Duracion del token de sesion (dias).
   TOKEN_DAYS: 30,
+  // ID de cliente OAuth de Google para "Iniciar sesion con Google" (personal
+  // TT Audit). Se crea una vez en la Consola de Google (ver apps-script/README).
+  // Debe ser el MISMO que uses en el frontend (VITE_GOOGLE_CLIENT_ID).
+  GOOGLE_CLIENT_ID: '',
 };
 
 // Orden de columnas por pestana (fila 1 = encabezados).
@@ -79,6 +83,7 @@ function handle(env) {
   // Publico
   if (path === '/health') return { ok: true, time: new Date().toISOString() };
   if (path === '/auth/login' && method === 'POST') return login(body);
+  if (path === '/auth/google' && method === 'POST') return googleLogin(body);
 
   // De aqui en adelante requiere sesion
   var user = requireAuth(token);
@@ -111,7 +116,7 @@ function handle(env) {
       return ps;
     }
     if (seg.length === 1 && method === 'POST') {
-      requireRole(user, ['admin']);
+      requireRole(user, ['admin', 'cuenta']);
       if (!body.name || !body.account_id) throw apiError(400, 'Nombre y cuenta requeridos');
       return append('projects', { name: body.name, account_id: body.account_id });
     }
@@ -151,6 +156,32 @@ function login(body) {
   }
   var payload = {
     id: user.id, email: user.email, name: user.name, role: user.role,
+    driver_id: user.driver_id, account_id: user.account_id,
+  };
+  return { token: signToken(payload), user: payload };
+}
+
+// Inicio de sesion con Google (personal TT Audit). Recibe el ID token que emite
+// "Iniciar sesion con Google" en el frontend, lo valida contra Google y, si el
+// correo esta autorizado en la pestana "users", emite la sesion.
+function googleLogin(body) {
+  var idToken = body.id_token || body.credential || '';
+  if (!idToken) throw apiError(400, 'Falta el token de Google');
+  if (!CONFIG.GOOGLE_CLIENT_ID) throw apiError(500, 'Falta configurar GOOGLE_CLIENT_ID en el backend');
+
+  var resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  var info;
+  try { info = JSON.parse(resp.getContentText()); } catch (e) { info = null; }
+  if (!info || info.error || resp.getResponseCode() !== 200) throw apiError(401, 'Token de Google invalido');
+  if (String(info.aud) !== String(CONFIG.GOOGLE_CLIENT_ID)) throw apiError(401, 'Token de Google no valido para esta app');
+  if (String(info.email_verified) !== 'true') throw apiError(401, 'Correo de Google no verificado');
+
+  var email = String(info.email || '').trim().toLowerCase();
+  var user = readAll('users').find(function (u) { return String(u.email).trim().toLowerCase() === email; });
+  if (!user) throw apiError(403, 'Tu correo (' + email + ') no esta autorizado. Contacta al administrador.');
+
+  var payload = {
+    id: user.id, email: user.email, name: user.name || info.name || email, role: user.role,
     driver_id: user.driver_id, account_id: user.account_id,
   };
   return { token: signToken(payload), user: payload };
@@ -341,8 +372,9 @@ function updateDriver(id, b) {
 }
 
 function scopeFilter(user, routes) {
+  // Los choferes solo ven sus propias rutas. Admins y responsables de cuenta
+  // (gestores internos) ven todas.
   if (user.role === 'chofer') return routes.filter(function (r) { return Number(r.driver_id) === Number(user.driver_id); });
-  if (user.role === 'cuenta') return routes.filter(function (r) { return Number(r.account_id) === Number(user.account_id); });
   return routes;
 }
 
@@ -360,7 +392,6 @@ function getRouteById(user, id) {
   var route = getById('routes', id);
   if (!route) throw apiError(404, 'Ruta no encontrada');
   if (user.role === 'chofer' && Number(route.driver_id) !== Number(user.driver_id)) throw apiError(403, 'No autorizado');
-  if (user.role === 'cuenta' && Number(route.account_id) !== Number(user.account_id)) throw apiError(403, 'No autorizado');
   return enrichOne(route);
 }
 
@@ -495,7 +526,52 @@ function setup() {
     sh.setFrozenRows(1);
   });
   seedIfEmpty();
-  return 'Setup completo. Usuarios de prueba: admin@ttaudit.com / admin123';
+  return 'Setup completo. Personal entra con Google; chofer cris@ttaudit.com / Cris';
+}
+
+// Aplica userDirectory() sobre la hoja aunque ya tenga datos: agrega los usuarios
+// que falten (por correo) y actualiza nombre/rol/chofer de los existentes. Al
+// chofer nuevo le crea su registro en "drivers" si no existe. No borra usuarios
+// que ya no esten en la lista. Ejecutala desde el editor cuando cambies la lista.
+function syncUsers() {
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var existing = readAll('users');
+    var byEmail = {};
+    existing.forEach(function (u) { byEmail[String(u.email).trim().toLowerCase()] = u; });
+    var drivers = readAll('drivers');
+    var driverByName = {};
+    drivers.forEach(function (d) { driverByName[String(d.name).trim().toLowerCase()] = d; });
+
+    var added = 0, updated = 0;
+    userDirectory().forEach(function (u) {
+      var email = String(u.email).trim().toLowerCase();
+      var driverId = '';
+      if (u.driver) {
+        var dExist = driverByName[String(u.driver.name).trim().toLowerCase()];
+        if (dExist) driverId = dExist.id;
+        else {
+          var created = append('drivers', { name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1 });
+          driverId = created.id;
+          driverByName[String(u.driver.name).trim().toLowerCase()] = created;
+        }
+      }
+      var current = byEmail[email];
+      if (current) {
+        var patch = { name: u.name, role: u.role, driver_id: driverId || current.driver_id || '' };
+        if (u.password) patch.password_hash = hashPassword(u.password);
+        updateById('users', current.id, patch);
+        updated++;
+      } else {
+        append('users', {
+          email: u.email, password_hash: u.password ? hashPassword(u.password) : '',
+          name: u.name, role: u.role, driver_id: driverId, account_id: '',
+        });
+        added++;
+      }
+    });
+    return 'Usuarios sincronizados. Agregados: ' + added + ', actualizados: ' + updated + '.';
+  } finally { lock.releaseLock(); }
 }
 
 function seedIfEmpty() {
@@ -518,6 +594,29 @@ function writeRows(tab, objs) {
   rng.setValues(values);
 }
 
+// Lista oficial de usuarios. Editala aqui y ejecuta syncUsers() para aplicarla
+// aunque la hoja ya tenga datos (agrega los que falten y actualiza rol/chofer).
+// - Admin y cuenta entran con Google (no necesitan contrasena).
+// - Chofer entra con correo + contrasena.
+function userDirectory() {
+  return [
+    // Admins (acceso total; Pamela asigna rutas)
+    { email: 'ccamarena@ttaudit.com', name: 'Claudia Camarena', role: 'admin' },
+    { email: 'logistica@palmera.pe', name: 'Pamela - Logistica', role: 'admin' },
+    { email: 'epezo@ttaudit.com', name: 'E. Pezo', role: 'admin' },
+    { email: 'botero@ttaudit.com', name: 'Botero', role: 'admin' },
+    { email: 'rgallo@ttaudit.com', name: 'R. Gallo', role: 'admin' },
+    { email: 'operaciones@ttaudit.com', name: 'Operaciones TT Audit', role: 'admin' },
+    // Responsables de cuenta (crean proyectos para todas las cuentas)
+    { email: 'rpulido@ttaudit.com', name: 'R. Pulido', role: 'cuenta' },
+    { email: 'dolaguibel@ttaudit.com', name: 'D. Olaguibel', role: 'cuenta' },
+    { email: 'mcarhuallanqui@ttaudit.com', name: 'M. Carhuallanqui', role: 'cuenta' },
+    { email: 'ghidalgo@ttaudit.com', name: 'G. Hidalgo', role: 'cuenta' },
+    // Choferes (correo + contrasena)
+    { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Cris', phone: '', vehicle: '', supervisor: 'Pamela' } },
+  ];
+}
+
 function seedData() {
   var drivers = [
     { id: 1, name: 'Christian Herrera', phone: '999111222', vehicle: 'ABC-123', supervisor: 'Pamela', active: 1 },
@@ -530,14 +629,20 @@ function seedData() {
     { id: 2, name: 'Reposicion Tiendas SJL', account_id: 1 },
     { id: 3, name: 'Entrega Canal Moderno', account_id: 2 },
   ];
-  var users = [
-    { id: 1, email: 'admin@ttaudit.com', password_hash: hashPassword('admin123'), name: 'Administrador TT Audit', role: 'admin', driver_id: '', account_id: '' },
-    { id: 2, email: 'christian.herrera@ttaudit.com', password_hash: hashPassword('chofer123'), name: 'Christian Herrera', role: 'chofer', driver_id: 1, account_id: '' },
-    { id: 3, email: 'luis.ramirez@ttaudit.com', password_hash: hashPassword('chofer123'), name: 'Luis Ramirez', role: 'chofer', driver_id: 2, account_id: '' },
-    { id: 4, email: 'jorge.salas@ttaudit.com', password_hash: hashPassword('chofer123'), name: 'Jorge Salas', role: 'chofer', driver_id: 3, account_id: '' },
-    { id: 5, email: 'cuenta.alicorp@cliente.com', password_hash: hashPassword('cuenta123'), name: 'Alicorp - Contacto', role: 'cuenta', driver_id: '', account_id: 1 },
-    { id: 6, email: 'cuenta.backus@cliente.com', password_hash: hashPassword('cuenta123'), name: 'Backus - Contacto', role: 'cuenta', driver_id: '', account_id: 2 },
-  ];
+
+  // Usuarios reales (ver userDirectory). Al chofer se le crea su registro en drivers.
+  var nextDriverId = drivers.reduce(function (m, d) { return Math.max(m, d.id); }, 0);
+  var users = userDirectory().map(function (u, i) {
+    var driverId = '';
+    if (u.driver) {
+      driverId = ++nextDriverId;
+      drivers.push({ id: driverId, name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1 });
+    }
+    return {
+      id: i + 1, email: u.email, password_hash: u.password ? hashPassword(u.password) : '',
+      name: u.name, role: u.role, driver_id: driverId, account_id: '',
+    };
+  });
 
   var today = new Date();
   var monday = new Date(today);

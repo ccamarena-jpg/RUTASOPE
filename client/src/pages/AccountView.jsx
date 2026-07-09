@@ -1,12 +1,99 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { toISODate } from '../utils/date';
-import { downloadRoutesCsv } from '../utils/csv';
-import StatusSummary from '../components/StatusSummary.jsx';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
+const TABS = [
+  { id: 'projects', label: 'Proyectos' },
+  { id: 'tracking', label: 'Seguimiento en tiempo real' },
+];
+
 export default function AccountView() {
+  const [tab, setTab] = useState('projects');
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Panel de responsable de cuenta</h1>
+        <p>Crea los proyectos de cada cuenta y sigue el estado de las rutas en tiempo real.</p>
+      </div>
+      <div className="tabs">
+        {TABS.map((t) => (
+          <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      {tab === 'projects' ? <ProjectsPanel /> : <TrackingPanel />}
+    </div>
+  );
+}
+
+function ProjectsPanel() {
+  const [accounts, setAccounts] = useState([]);
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [projects, setProjects] = useState([]);
+  const [projectName, setProjectName] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { api.getAccounts().then(setAccounts).catch((e) => setError(e.message)); }, []);
+
+  const loadProjects = useCallback(() => {
+    if (!selectedAccount) { setProjects([]); return; }
+    api.getProjects(selectedAccount).then(setProjects).catch((e) => setError(e.message));
+  }, [selectedAccount]);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  async function addProject(e) {
+    e.preventDefault();
+    if (!selectedAccount) { setError('Selecciona una cuenta primero'); return; }
+    setError(''); setBusy(true);
+    try {
+      await api.createProject({ name: projectName, account_id: selectedAccount });
+      setProjectName('');
+      loadProjects();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card">
+      <div className="section-title"><span className="st-icon">📁</span> Proyectos por cuenta</div>
+      {error && <div className="error-msg">{error}</div>}
+
+      <div className="field" style={{ maxWidth: 360 }}>
+        <label>Cuenta / Cliente</label>
+        <select value={selectedAccount} onChange={(e) => setSelectedAccount(e.target.value)}>
+          <option value="">Selecciona una cuenta...</option>
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </div>
+
+      {selectedAccount && (
+        <>
+          {projects.length === 0 ? (
+            <div className="empty-state" style={{ padding: '20px 0' }}>Esta cuenta aun no tiene proyectos.</div>
+          ) : (
+            <table className="simple" style={{ margin: '12px 0' }}>
+              <thead><tr><th>Proyecto</th></tr></thead>
+              <tbody>{projects.map((p) => <tr key={p.id}><td>{p.name}</td></tr>)}</tbody>
+            </table>
+          )}
+          <form onSubmit={addProject} className="toolbar" style={{ marginTop: 8 }}>
+            <input placeholder="Nombre del nuevo proyecto" value={projectName} onChange={(e) => setProjectName(e.target.value)} required />
+            <button className="btn btn-primary" type="submit" disabled={busy}>+ Agregar proyecto</button>
+          </form>
+        </>
+      )}
+      {accounts.length === 0 && !error && (
+        <div className="empty-state" style={{ padding: '20px 0' }}>
+          Aun no hay cuentas creadas. Pide a un administrador que registre la cuenta/cliente.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrackingPanel() {
   const [date, setDate] = useState(toISODate(new Date()));
   const [routes, setRoutes] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -25,12 +112,7 @@ export default function AccountView() {
   const visible = statusFilter === 'todos' ? routes : routes.filter((r) => r.status === statusFilter);
 
   return (
-    <div>
-      <div className="page-head">
-        <h1>Seguimiento de entregas</h1>
-        <p>Estado de tus rutas en tiempo real. Se actualiza automaticamente cada 15 segundos.</p>
-      </div>
-      <div className="card">
+    <div className="card">
       <div className="card-header">
         <h2 style={{ fontSize: 17 }}>📍 Rutas en tiempo real</h2>
         <div className="toolbar">
@@ -40,14 +122,12 @@ export default function AccountView() {
             <option value="pendiente">Pendiente</option>
             <option value="en_curso">En curso</option>
             <option value="completado">Completado</option>
+            <option value="no_realizada">No realizada</option>
           </select>
           <button className="btn btn-secondary" onClick={load}>Actualizar</button>
-          <button className="btn btn-secondary" onClick={() => downloadRoutesCsv(visible, `rutas_${date}.csv`)} disabled={visible.length === 0}>⬇ Exportar CSV</button>
         </div>
       </div>
       {lastUpdated && <div style={{ fontSize: 12, color: '#889', marginBottom: 10 }}>Ultima actualizacion: {lastUpdated.toLocaleTimeString()} (auto cada 15s)</div>}
-
-      <StatusSummary routes={routes} />
 
       {visible.length === 0 ? (
         <div className="empty-state">No hay rutas para mostrar.</div>
@@ -58,14 +138,15 @@ export default function AccountView() {
               <div>
                 <div className="hour">{r.hour}</div>
                 <div className="destino">{r.destino}</div>
-                <div className="meta">Chofer: {r.driver_name} {r.project_name ? `| Proyecto: ${r.project_name}` : ''}</div>
+                <div className="meta">Cuenta: {r.account_name} {r.project_name ? `| Proyecto: ${r.project_name}` : ''}</div>
+                <div className="meta">Chofer: {r.driver_name}</div>
                 {r.motivo && <div className="meta">{r.motivo}</div>}
               </div>
               <span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span>
             </div>
             <div className="meta">Salida: {r.hora_salida || '-'} &nbsp;|&nbsp; Llegada: {r.hora_llegada || '-'}</div>
-            {r.status === 'no_realizada' && r.motivo_no_realizada && <div className="meta" style={{ color: 'var(--red)' }}>No realizada: {r.motivo_no_realizada}</div>}
             {r.comentario_chofer && <div className="meta">Comentario del chofer: {r.comentario_chofer}</div>}
+            {r.motivo_no_realizada && <div className="meta">Motivo no realizada: {r.motivo_no_realizada}</div>}
             {r.guia_url && (
               <div className="file-info">
                 Guia de remision: <a href={r.guia_url} target="_blank" rel="noreferrer">ver documento</a>
@@ -74,7 +155,6 @@ export default function AccountView() {
           </div>
         ))
       )}
-      </div>
     </div>
   );
 }

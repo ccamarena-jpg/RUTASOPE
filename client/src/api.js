@@ -76,6 +76,7 @@ async function call(path, { method = 'GET', body = null, query = null, file = nu
 
 export const api = {
   login: (email, password) => call('/auth/login', { method: 'POST', body: { email, password } }),
+  googleLogin: (idToken) => call('/auth/google', { method: 'POST', body: { id_token: idToken } }),
 
   getDrivers: () => call('/drivers'),
   createDriver: (payload) => call('/drivers', { method: 'POST', body: payload }),
