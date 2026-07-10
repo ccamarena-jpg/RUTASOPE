@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 
-const MAPS_KEY = (import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) || '';
+const MAPS_KEY =
+  (import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) ||
+  'AIzaSyC07b6izx5TdLMceKwmw8-G9UhFfoVNEyU';
 const LIMA = { lat: -12.0464, lng: -77.0428 };
 
 function loadMaps() {
