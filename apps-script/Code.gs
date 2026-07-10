@@ -710,6 +710,27 @@ function userDirectory() {
   ];
 }
 
+// Cuentas oficiales. Ejecuta setupAccounts() desde el editor para cargarlas.
+// Es idempotente: solo agrega las que falten (compara por nombre). No borra
+// cuentas existentes. Los proyectos se crean aparte (varian por cuenta).
+function accountDirectory() {
+  return ['BAT', 'Alicorp', 'Ilko', 'Casa Europa', 'Edgwell', 'Arca Continental', 'Palmera'];
+}
+
+function setupAccounts() {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var existing = readAll('accounts');
+    var have = {};
+    existing.forEach(function (a) { have[String(a.name).trim().toLowerCase()] = true; });
+    var added = 0;
+    accountDirectory().forEach(function (name) {
+      if (!have[name.trim().toLowerCase()]) { append('accounts', { name: name }); added++; }
+    });
+    return 'Cuentas cargadas. Agregadas: ' + added + '. Total ahora: ' + readAll('accounts').length + '.';
+  } finally { lock.releaseLock(); }
+}
+
 function seedData() {
   var drivers = [
     { id: 1, name: 'Christian Herrera', phone: '999111222', vehicle: 'ABC-123', supervisor: 'Pamela', active: 1 },
