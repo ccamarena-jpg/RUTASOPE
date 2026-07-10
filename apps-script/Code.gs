@@ -453,7 +453,8 @@ function createRoute(user, b) {
     date: b.date, hour: b.hour, driver_id: b.driver_id, account_id: b.account_id, project_id: b.project_id || null,
     destino: b.destino, motivo: b.motivo || '', status: 'pendiente', hora_salida: '', hora_llegada: '',
     comentario_chofer: '', motivo_no_realizada: '', guia_url: '', created_by: user.email, updated_at: nowISO(),
-    cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '', tipo_movimiento: '', elementos_trasladados: '',
+    cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '',
+    tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
     lat: b.lat || '', lng: b.lng || '',
   });
   return enrichOne(rec);
@@ -466,6 +467,8 @@ function updateRoute(id, b) {
     date: def(b.date, ex.date), hour: def(b.hour, ex.hour), driver_id: def(b.driver_id, ex.driver_id),
     account_id: def(b.account_id, ex.account_id), project_id: def(b.project_id, ex.project_id),
     destino: def(b.destino, ex.destino), motivo: def(b.motivo, ex.motivo),
+    tipo_movimiento: def(b.tipo_movimiento, ex.tipo_movimiento),
+    elementos_trasladados: def(b.elementos_trasladados, ex.elementos_trasladados),
     lat: def(b.lat, ex.lat), lng: def(b.lng, ex.lng), updated_at: nowISO(),
   };
   return enrichOne(updateById('routes', id, patch));

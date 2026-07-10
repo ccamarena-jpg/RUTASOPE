@@ -100,6 +100,11 @@ function RouteCard({ route, onUpdated }) {
     run(() => api.driverGuia(route.id, file));
   }
 
+  const done = route.status === 'completado' || route.status === 'no_realizada';
+  const navUrl = (route.lat != null && route.lat !== '' && route.lng != null && route.lng !== '')
+    ? `https://www.google.com/maps/dir/?api=1&destination=${route.lat},${route.lng}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(route.destino || '')}`;
+
   return (
     <div className="route-card">
       <button className="route-head" onClick={() => setExpanded((v) => !v)}>
@@ -119,93 +124,112 @@ function RouteCard({ route, onUpdated }) {
         <div className="route-body">
           {error && <div className="error-msg">{error}</div>}
 
+          <div className="actions">
+            <a className="btn btn-primary" href={navUrl} target="_blank" rel="noreferrer">🧭 Navegar con Google Maps</a>
+          </div>
+
           {route.status === 'no_realizada' && route.motivo_no_realizada && (
             <div className="meta" style={{ color: 'var(--red)' }}>No realizada: {route.motivo_no_realizada}</div>
           )}
 
-          <div className="actions">
-            {route.status === 'pendiente' && (
-              <button className="btn btn-primary" disabled={busy} onClick={marcarSalida}>Marcar hora de salida</button>
-            )}
-            {route.status === 'en_curso' && (
-              <button className="btn btn-success" disabled={busy} onClick={marcarLlegada}>Marcar hora de llegada</button>
-            )}
-            {(route.status === 'pendiente' || route.status === 'en_curso') && !showNoReal && (
-              <button className="btn btn-secondary" disabled={busy} onClick={() => setShowNoReal(true)}>Marcar no realizada</button>
-            )}
-          </div>
+          {done ? (
+            <div className="entrega-box">
+              <div className="entrega-title">Resumen de entrega</div>
+              {route.tipo_movimiento && <div className="meta">Tipo de movimiento: {route.tipo_movimiento}</div>}
+              {route.elementos_trasladados && <div className="meta">Elementos: {route.elementos_trasladados}</div>}
+              {route.cantidad_bultos && <div className="meta">Bultos: {route.cantidad_bultos}</div>}
+              {route.gr_firmada && <div className="meta">GR firmada: {route.gr_firmada}</div>}
+              {route.comentario_chofer && <div className="meta">Comentario: {route.comentario_chofer}</div>}
+              {route.foto_elementos_url && <div className="file-info">Foto de elementos: <a href={route.foto_elementos_url} target="_blank" rel="noreferrer">ver foto</a></div>}
+              {route.guia_url && <div className="file-info">Guia de remision: <a href={route.guia_url} target="_blank" rel="noreferrer">ver archivo</a></div>}
+            </div>
+          ) : (
+            <>
+              <div className="actions">
+                {route.status === 'pendiente' && (
+                  <button className="btn btn-success" disabled={busy} onClick={marcarSalida}>Marcar hora de salida</button>
+                )}
+                {route.status === 'en_curso' && (
+                  <button className="btn btn-success" disabled={busy} onClick={marcarLlegada}>Marcar hora de llegada</button>
+                )}
+                {!showNoReal && (
+                  <button className="btn btn-secondary" disabled={busy} onClick={() => setShowNoReal(true)}>Marcar no realizada</button>
+                )}
+              </div>
 
-          {showNoReal && (
-            <div className="no-real-box">
+              {showNoReal && (
+                <div className="no-real-box">
+                  <textarea
+                    placeholder="Motivo por el que no se realizo (obligatorio): ej. cliente cerrado, direccion incorrecta..."
+                    value={motivoNoReal}
+                    onChange={(e) => setMotivoNoReal(e.target.value)}
+                  />
+                  <div className="actions">
+                    <button className="btn btn-danger" disabled={busy} onClick={marcarNoRealizada}>Confirmar no realizada</button>
+                    <button className="btn btn-secondary" disabled={busy} onClick={() => { setShowNoReal(false); setMotivoNoReal(''); setError(''); }}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="entrega-box">
+                <div className="entrega-title">Datos de entrega</div>
+                <div className="field">
+                  <label>Tipo de movimiento</label>
+                  <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
+                </div>
+                <div className="field">
+                  <label>Elementos trasladados (detalle de la mercancia)</label>
+                  <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} placeholder="Detalle de la mercancia..." />
+                </div>
+                <div className="form-row">
+                  <div className="field">
+                    <label>Cantidad de bultos (paquetes/cajas)</label>
+                    <input type="number" min="0" inputMode="numeric" value={cantidadBultos} onChange={(e) => setCantidadBultos(e.target.value)} placeholder="Ej: 5" />
+                  </div>
+                  <div className="field">
+                    <label>¿GR firmada por cliente?</label>
+                    <select value={grFirmada} onChange={(e) => setGrFirmada(e.target.value)}>
+                      <option value="">Seleccionar...</option>
+                      <option value="Si">Si</option>
+                      <option value="No">No</option>
+                      <option value="Pendiente">Pendiente</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="actions">
+                  <button className="btn btn-primary" disabled={busy} onClick={guardarEntrega}>Guardar datos de entrega</button>
+                </div>
+
+                <div className="actions" style={{ marginTop: 10 }}>
+                  <label className="btn btn-secondary" style={{ margin: 0 }}>
+                    Foto de elementos entregados/recogidos
+                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={subirFotoElementos} disabled={busy} />
+                  </label>
+                </div>
+                {route.foto_elementos_url && (
+                  <div className="file-info">Foto de elementos: <a href={route.foto_elementos_url} target="_blank" rel="noreferrer">ver foto</a></div>
+                )}
+              </div>
+
               <textarea
-                placeholder="Motivo por el que no se realizo (obligatorio): ej. cliente cerrado, direccion incorrecta..."
-                value={motivoNoReal}
-                onChange={(e) => setMotivoNoReal(e.target.value)}
+                placeholder="Comentarios de la visita..."
+                value={comentario}
+                onChange={(e) => setComentario(e.target.value)}
               />
               <div className="actions">
-                <button className="btn btn-danger" disabled={busy} onClick={marcarNoRealizada}>Confirmar no realizada</button>
-                <button className="btn btn-secondary" disabled={busy} onClick={() => { setShowNoReal(false); setMotivoNoReal(''); setError(''); }}>Cancelar</button>
+                <button className="btn btn-secondary" disabled={busy} onClick={guardarComentario}>Guardar comentario</button>
               </div>
-            </div>
-          )}
 
-          <div className="entrega-box">
-            <div className="entrega-title">Datos de entrega</div>
-            <div className="field">
-              <label>Tipo de movimiento</label>
-              <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
-            </div>
-            <div className="field">
-              <label>Elementos trasladados (detalle de la mercancia)</label>
-              <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} placeholder="Detalle de la mercancia..." />
-            </div>
-            <div className="form-row">
-              <div className="field">
-                <label>Cantidad de bultos (paquetes/cajas)</label>
-                <input type="number" min="0" inputMode="numeric" value={cantidadBultos} onChange={(e) => setCantidadBultos(e.target.value)} placeholder="Ej: 5" />
+              <div className="actions" style={{ marginTop: 10 }}>
+                <label className="btn btn-secondary" style={{ margin: 0 }}>
+                  Adjuntar guia de remision
+                  <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={subirGuia} disabled={busy} />
+                </label>
               </div>
-              <div className="field">
-                <label>¿GR firmada por cliente?</label>
-                <select value={grFirmada} onChange={(e) => setGrFirmada(e.target.value)}>
-                  <option value="">Seleccionar...</option>
-                  <option value="Si">Si</option>
-                  <option value="No">No</option>
-                  <option value="Pendiente">Pendiente</option>
-                </select>
-              </div>
-            </div>
-            <div className="actions">
-              <button className="btn btn-primary" disabled={busy} onClick={guardarEntrega}>Guardar datos de entrega</button>
-            </div>
-
-            <div className="actions" style={{ marginTop: 10 }}>
-              <label className="btn btn-secondary" style={{ margin: 0 }}>
-                Foto de elementos entregados/recogidos
-                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={subirFotoElementos} disabled={busy} />
-              </label>
-            </div>
-            {route.foto_elementos_url && (
-              <div className="file-info">Foto de elementos: <a href={route.foto_elementos_url} target="_blank" rel="noreferrer">ver foto</a></div>
-            )}
-          </div>
-
-          <textarea
-            placeholder="Comentarios de la visita..."
-            value={comentario}
-            onChange={(e) => setComentario(e.target.value)}
-          />
-          <div className="actions">
-            <button className="btn btn-secondary" disabled={busy} onClick={guardarComentario}>Guardar comentario</button>
-          </div>
-
-          <div className="actions" style={{ marginTop: 10 }}>
-            <label className="btn btn-secondary" style={{ margin: 0 }}>
-              Adjuntar guia de remision
-              <input type="file" accept="image/*,.pdf" style={{ display: 'none' }} onChange={subirGuia} disabled={busy} />
-            </label>
-          </div>
-          {route.guia_url && (
-            <div className="file-info">Cargo adjunto: <a href={route.guia_url} target="_blank" rel="noreferrer">ver archivo</a></div>
+              {route.guia_url && (
+                <div className="file-info">Cargo adjunto: <a href={route.guia_url} target="_blank" rel="noreferrer">ver archivo</a></div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -23,6 +23,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState('dashboard');
   const [drivers, setDrivers] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [catalogUnlocked, setCatalogUnlocked] = useState(sessionStorage.getItem('ruteo_catalog_ok') === '1');
 
   const refreshCatalog = useCallback(() => {
     api.getDrivers().then(setDrivers).catch(() => {});
@@ -46,7 +47,11 @@ export default function AdminDashboard() {
       {tab === 'calendar' && <CalendarTab drivers={drivers} accounts={accounts} />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
-      {tab === 'catalog' && <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />}
+      {tab === 'catalog' && (
+        catalogUnlocked
+          ? <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />
+          : <CatalogGate onUnlock={() => { sessionStorage.setItem('ruteo_catalog_ok', '1'); setCatalogUnlocked(true); }} />
+      )}
     </div>
   );
 }
@@ -66,7 +71,7 @@ function CalendarTab({ drivers, accounts }) {
   const load = useCallback(() => {
     if (!driverId) return;
     const from = toISODate(weekStart);
-    const to = toISODate(addDays(weekStart, 5));
+    const to = toISODate(addDays(weekStart, 6));
     api.getRoutes({ from, to, driver_id: driverId }).then(setRoutes).catch(() => {});
   }, [driverId, weekStart]);
 
@@ -306,6 +311,34 @@ function TodayTab() {
           </tbody>
         </table>
       )}
+    </div>
+  );
+}
+
+const CATALOG_PASSWORD = 'Audit2026';
+
+function CatalogGate({ onUnlock }) {
+  const [pw, setPw] = useState('');
+  const [error, setError] = useState('');
+
+  function submit(e) {
+    e.preventDefault();
+    if (pw === CATALOG_PASSWORD) onUnlock();
+    else setError('Clave incorrecta.');
+  }
+
+  return (
+    <div className="card" style={{ maxWidth: 380, margin: '0 auto' }}>
+      <div className="section-title"><span className="st-icon">🔒</span> Seccion protegida</div>
+      <p style={{ color: 'var(--text-soft)', fontSize: 13.5, marginTop: -6 }}>Ingresa la clave para gestionar choferes, cuentas y proyectos.</p>
+      {error && <div className="error-msg">{error}</div>}
+      <form onSubmit={submit}>
+        <div className="field">
+          <label>Clave</label>
+          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
+        </div>
+        <button className="btn btn-primary btn-block" type="submit">Ingresar</button>
+      </form>
     </div>
   );
 }

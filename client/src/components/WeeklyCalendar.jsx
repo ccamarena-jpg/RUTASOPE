@@ -2,7 +2,7 @@ import React from 'react';
 import { HOURS, DAY_LABELS, toISODate, addDays, formatShort } from '../utils/date';
 
 export default function WeeklyCalendar({ drivers, driverId, onDriverChange, weekStart, onWeekChange, routes, onSlotClick, driverMeta }) {
-  const days = Array.from({ length: 6 }, (_, i) => addDays(weekStart, i));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const weekEnd = days[days.length - 1];
 
   const routesBySlot = {};

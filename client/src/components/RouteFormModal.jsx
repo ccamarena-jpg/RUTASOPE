@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { HOURS } from '../utils/date';
 import AddressPicker from './AddressPicker.jsx';
+import MovimientoPicker from './MovimientoPicker.jsx';
 
 export default function RouteFormModal({ initial, drivers, accounts, onClose, onSaved, onDeleted }) {
   const isEdit = Boolean(initial?.id);
@@ -15,6 +16,8 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const [motivo, setMotivo] = useState(initial?.motivo || '');
   const [lat, setLat] = useState(initial?.lat ?? null);
   const [lng, setLng] = useState(initial?.lng ?? null);
+  const [tipoMovimiento, setTipoMovimiento] = useState(initial?.tipo_movimiento || '');
+  const [elementos, setElementos] = useState(initial?.elementos_trasladados || '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -37,7 +40,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), project_id: projectId ? Number(projectId) : null, destino, motivo, lat, lng };
+      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), project_id: projectId ? Number(projectId) : null, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -111,6 +114,14 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
           <div className="field">
             <label>Motivo / detalle de la visita</label>
             <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder="Ej: Entrega de pedido #4521" />
+          </div>
+          <div className="field">
+            <label>Tipo de movimiento</label>
+            <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
+          </div>
+          <div className="field">
+            <label>Elementos trasladados (detalle de la mercancia)</label>
+            <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} rows={2} placeholder="Detalle de la mercancia..." />
           </div>
           <div className="modal-actions">
             {isEdit && <button type="button" className="btn btn-danger" onClick={handleDelete}>Eliminar</button>}
