@@ -96,6 +96,7 @@ export const api = {
   updateRoute: (id, payload) => call(`/routes/${id}`, { method: 'PUT', body: payload }),
   deleteRoute: (id) => call(`/routes/${id}`, { method: 'DELETE' }),
   bulkUpload: (file) => call('/routes/bulk', { method: 'POST', file }),
+  registrarViaje: (payload) => call('/routes/viaje', { method: 'POST', body: payload }),
 
   driverSalida: (id, hora) => call(`/routes/${id}/salida`, { method: 'POST', body: { hora } }),
   driverLlegada: (id, hora) => call(`/routes/${id}/llegada`, { method: 'POST', body: { hora } }),

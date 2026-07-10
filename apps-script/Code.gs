@@ -44,6 +44,7 @@ var SCHEMA = {
     'status', 'hora_salida', 'hora_llegada', 'comentario_chofer', 'motivo_no_realizada',
     'guia_url', 'created_by', 'updated_at',
     'cantidad_bultos', 'gr_firmada', 'foto_elementos_url',
+    'tipo_movimiento', 'elementos_trasladados',
   ],
 };
 var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1 };
@@ -133,6 +134,7 @@ function handle(env) {
     if (seg.length === 1 && method === 'GET') return getRoutes(user, query);
     if (seg.length === 1 && method === 'POST') { requireRole(user, ['admin']); return createRoute(user, body); }
     if (seg.length === 2 && seg[1] === 'bulk' && method === 'POST') { requireRole(user, ['admin']); return bulkRoutes(user, body); }
+    if (seg.length === 2 && seg[1] === 'viaje' && method === 'POST') { requireRole(user, ['chofer']); return choferViaje(user, body); }
     if (seg.length === 2 && method === 'GET') return getRouteById(user, seg[1]);
     if (seg.length === 2 && method === 'PUT') { requireRole(user, ['admin']); return updateRoute(seg[1], body); }
     if (seg.length === 2 && method === 'DELETE') { requireRole(user, ['admin']); deleteById('routes', seg[1]); return { ok: true }; }
@@ -433,7 +435,7 @@ function createRoute(user, b) {
     date: b.date, hour: b.hour, driver_id: b.driver_id, account_id: b.account_id, project_id: b.project_id || null,
     destino: b.destino, motivo: b.motivo || '', status: 'pendiente', hora_salida: '', hora_llegada: '',
     comentario_chofer: '', motivo_no_realizada: '', guia_url: '', created_by: user.email, updated_at: nowISO(),
-    cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '',
+    cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '', tipo_movimiento: '', elementos_trasladados: '',
   });
   return enrichOne(rec);
 }
@@ -533,13 +535,31 @@ function choferGuia(user, id, b) {
   return enrichOne(updateById('routes', id, { guia_url: url, updated_at: nowISO() }));
 }
 
-// Datos de entrega: cantidad de bultos y si la GR fue firmada por el cliente.
+// Datos de entrega: tipo de movimiento, elementos, bultos y firma de la GR.
 function choferEntrega(user, id, b) {
   ensureOwnRoute(user, id);
   var patch = { updated_at: nowISO() };
   if (b.cantidad_bultos !== undefined) patch.cantidad_bultos = b.cantidad_bultos || '';
   if (b.gr_firmada !== undefined) patch.gr_firmada = b.gr_firmada || '';
+  if (b.tipo_movimiento !== undefined) patch.tipo_movimiento = b.tipo_movimiento || '';
+  if (b.elementos_trasladados !== undefined) patch.elementos_trasladados = b.elementos_trasladados || '';
   return enrichOne(updateById('routes', id, patch));
+}
+
+// Registrar viaje: el chofer crea una ruta para si mismo (viaje no programado).
+function choferViaje(user, b) {
+  if (!user.driver_id) throw apiError(400, 'Tu usuario no tiene un chofer vinculado. Avisa al administrador.');
+  if (!b.destino) throw apiError(400, 'Indica el destino del viaje');
+  var rec = append('routes', {
+    date: b.date || todayISO(), hour: b.hour || hhmm(), driver_id: user.driver_id,
+    account_id: b.account_id || '', project_id: b.project_id || '',
+    destino: b.destino, motivo: b.motivo || '', status: 'pendiente',
+    hora_salida: '', hora_llegada: '', comentario_chofer: '', motivo_no_realizada: '',
+    guia_url: '', created_by: user.email, updated_at: nowISO(),
+    cantidad_bultos: b.cantidad_bultos || '', gr_firmada: b.gr_firmada || '', foto_elementos_url: '',
+    tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
+  });
+  return enrichOne(rec);
 }
 
 // Foto de los elementos entregados/recogidos (se sube a Drive, aparte de la guia).
@@ -562,6 +582,7 @@ function uploadGuia(dataB64, name, mime) {
 
 function nowISO() { return new Date().toISOString(); }
 function hhmm() { return Utilities.formatDate(new Date(), tz(), 'HH:mm'); }
+function todayISO() { return Utilities.formatDate(new Date(), tz(), 'yyyy-MM-dd'); }
 
 // ====== SETUP / SEMILLA (ejecutar una vez desde el editor) ======
 function setup() {

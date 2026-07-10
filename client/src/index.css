@@ -459,7 +459,16 @@ table.simple tr:hover td { background: var(--gray-row); }
 .driver-date-nav .date-label { font-weight: 700; color: var(--navy); text-transform: capitalize; }
 .driver-date-nav button { background: var(--blue-light); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-weight: 700; color: var(--navy); }
 
-.route-card { background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.route-card { background: white; border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.route-head { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 16px; background: none; border: none; text-align: left; }
+.route-head:hover { background: var(--gray-row); }
+.route-head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.route-head-right .chevron { color: var(--text-soft); font-size: 12px; }
+.route-body { padding: 0 16px 16px; }
+.check-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.check-pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid var(--border-strong); border-radius: 20px; font-size: 13.5px; cursor: pointer; background: #fff; }
+.check-pill.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.check-pill input { margin: 0; }
 .route-card .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .route-card .hour { font-size: 22px; font-weight: 800; color: var(--navy); }
 .route-card .destino { font-weight: 700; margin: 6px 0 2px; }

@@ -21,6 +21,8 @@ const COLUMNS = [
   ['hora_llegada', 'Hora llegada'],
   ['comentario_chofer', 'Comentario chofer'],
   ['motivo_no_realizada', 'Motivo no realizada'],
+  ['tipo_movimiento', 'Tipo de movimiento'],
+  ['elementos_trasladados', 'Elementos trasladados'],
   ['cantidad_bultos', 'Cantidad de bultos'],
   ['gr_firmada', 'GR firmada por cliente'],
   ['foto_elementos_url', 'Foto de elementos'],
