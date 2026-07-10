@@ -18,8 +18,13 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const [lng, setLng] = useState(initial?.lng ?? null);
   const [tipoMovimiento, setTipoMovimiento] = useState(initial?.tipo_movimiento || '');
   const [elementos, setElementos] = useState(initial?.elementos_trasladados || '');
+  const [costoTransporte, setCostoTransporte] = useState(initial?.costo_transporte ?? '');
+  const [costoProveedor, setCostoProveedor] = useState(initial?.costo_proveedor ?? '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const selDriver = drivers.find((d) => Number(d.id) === Number(driverId));
+  const isProveedor = !!(selDriver && Number(selDriver.es_proveedor) === 1);
 
   function handlePick({ lat: la, lng: ln, address }) {
     setLat(la); setLng(ln);
@@ -40,7 +45,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos };
+      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos, costo_transporte: isProveedor ? costoTransporte : '', costo_proveedor: isProveedor ? costoProveedor : '' };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -128,6 +133,21 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
             <label>Elementos trasladados (detalle de la mercancia)</label>
             <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} rows={2} placeholder="Detalle de la mercancia..." />
           </div>
+          {isProveedor && (
+            <div className="entrega-box">
+              <div className="entrega-title">Costos (proveedor)</div>
+              <div className="form-row">
+                <div className="field">
+                  <label>Costo de transporte (S/)</label>
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={costoTransporte} onChange={(e) => setCostoTransporte(e.target.value)} placeholder="0.00" />
+                </div>
+                <div className="field">
+                  <label>Costo proveedor (S/)</label>
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={costoProveedor} onChange={(e) => setCostoProveedor(e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="modal-actions">
             {isEdit && <button type="button" className="btn btn-danger" onClick={handleDelete}>Eliminar</button>}
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>

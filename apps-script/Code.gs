@@ -36,7 +36,7 @@ var CONFIG = {
 // Orden de columnas por pestana (fila 1 = encabezados).
 var SCHEMA = {
   users: ['id', 'email', 'password_hash', 'name', 'role', 'driver_id', 'account_id'],
-  drivers: ['id', 'name', 'phone', 'vehicle', 'supervisor', 'active', 'last_lat', 'last_lng', 'last_loc_at'],
+  drivers: ['id', 'name', 'phone', 'vehicle', 'supervisor', 'active', 'last_lat', 'last_lng', 'last_loc_at', 'es_proveedor'],
   accounts: ['id', 'name'],
   projects: ['id', 'name', 'account_id'],
   routes: [
@@ -45,9 +45,10 @@ var SCHEMA = {
     'guia_url', 'created_by', 'updated_at',
     'cantidad_bultos', 'gr_firmada', 'foto_elementos_url',
     'tipo_movimiento', 'elementos_trasladados', 'lat', 'lng', 'proyecto',
+    'costo_transporte', 'costo_proveedor',
   ],
 };
-var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1 };
+var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1 };
 
 // ====== ENTRADAS HTTP ======
 function doGet() {
@@ -377,10 +378,10 @@ function enrichOne(route) { return route ? enrichRoutes([route], loadCatalogs())
 
 function createDriver(b) {
   if (!b.name) throw apiError(400, 'Nombre requerido');
-  return append('drivers', { name: b.name, phone: b.phone || '', vehicle: b.vehicle || '', supervisor: b.supervisor || '', active: 1 });
+  return append('drivers', { name: b.name, phone: b.phone || '', vehicle: b.vehicle || '', supervisor: b.supervisor || '', active: 1, es_proveedor: b.es_proveedor ? 1 : 0 });
 }
 function updateDriver(id, b) {
-  var patch = { name: b.name, phone: b.phone || '', vehicle: b.vehicle || '', supervisor: b.supervisor || '', active: b.active === undefined ? 1 : b.active };
+  var patch = { name: b.name, phone: b.phone || '', vehicle: b.vehicle || '', supervisor: b.supervisor || '', active: b.active === undefined ? 1 : b.active, es_proveedor: b.es_proveedor ? 1 : 0 };
   var rec = updateById('drivers', id, patch);
   if (!rec) throw apiError(404, 'Chofer no encontrado');
   return rec;
@@ -456,6 +457,7 @@ function createRoute(user, b) {
     cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '',
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
     lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
+    costo_transporte: b.costo_transporte || '', costo_proveedor: b.costo_proveedor || '',
   });
   return enrichOne(rec);
 }
@@ -470,6 +472,8 @@ function updateRoute(id, b) {
     tipo_movimiento: def(b.tipo_movimiento, ex.tipo_movimiento),
     elementos_trasladados: def(b.elementos_trasladados, ex.elementos_trasladados),
     proyecto: def(b.proyecto, ex.proyecto),
+    costo_transporte: def(b.costo_transporte, ex.costo_transporte),
+    costo_proveedor: def(b.costo_proveedor, ex.costo_proveedor),
     lat: def(b.lat, ex.lat), lng: def(b.lng, ex.lng), updated_at: nowISO(),
   };
   return enrichOne(updateById('routes', id, patch));
@@ -583,6 +587,7 @@ function createViaje(user, b) {
     cantidad_bultos: b.cantidad_bultos || '', gr_firmada: b.gr_firmada || '', foto_elementos_url: '',
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
     lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
+    costo_transporte: b.costo_transporte || '', costo_proveedor: b.costo_proveedor || '',
   });
   return enrichOne(rec);
 }
@@ -645,7 +650,7 @@ function syncUsers() {
         var dExist = driverByName[String(u.driver.name).trim().toLowerCase()];
         if (dExist) driverId = dExist.id;
         else {
-          var created = append('drivers', { name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1 });
+          var created = append('drivers', { name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1, es_proveedor: u.driver.es_proveedor ? 1 : 0 });
           driverId = created.id;
           driverByName[String(u.driver.name).trim().toLowerCase()] = created;
         }
@@ -709,7 +714,7 @@ function userDirectory() {
     // Choferes / externos (correo o usuario + contrasena)
     { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Cris', phone: '', vehicle: '', supervisor: 'Pamela' } },
     { email: 'ayronn@ttaudit.com', name: 'Ayronn', role: 'chofer', password: 'Ayronn', driver: { name: 'Ayronn', supervisor: 'Pamela' } },
-    { email: 'proveedor1', name: 'Proveedor 1', role: 'chofer', password: 'Proveedor1', driver: { name: 'Proveedor 1', supervisor: 'Pamela' } },
+    { email: 'proveedor1', name: 'Proveedor 1', role: 'chofer', password: 'Proveedor1', driver: { name: 'Proveedor 1', supervisor: 'Pamela', es_proveedor: 1 } },
   ];
 }
 
@@ -753,7 +758,7 @@ function seedData() {
     var driverId = '';
     if (u.driver) {
       driverId = ++nextDriverId;
-      drivers.push({ id: driverId, name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1 });
+      drivers.push({ id: driverId, name: u.driver.name, phone: u.driver.phone || '', vehicle: u.driver.vehicle || '', supervisor: u.driver.supervisor || '', active: 1, es_proveedor: u.driver.es_proveedor ? 1 : 0 });
     }
     return {
       id: i + 1, email: u.email, password_hash: u.password ? hashPassword(u.password) : '',

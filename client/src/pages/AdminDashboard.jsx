@@ -360,6 +360,7 @@ function DriversPanel({ drivers, onChange }) {
   const [phone, setPhone] = useState('');
   const [vehicle, setVehicle] = useState('');
   const [supervisor, setSupervisor] = useState('');
+  const [esProveedor, setEsProveedor] = useState(false);
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [editing, setEditing] = useState(null);
@@ -376,8 +377,8 @@ function DriversPanel({ drivers, onChange }) {
     e.preventDefault();
     setError('');
     try {
-      await api.createDriver({ name, phone, vehicle, supervisor });
-      setName(''); setPhone(''); setVehicle(''); setSupervisor('');
+      await api.createDriver({ name, phone, vehicle, supervisor, es_proveedor: esProveedor ? 1 : 0 });
+      setName(''); setPhone(''); setVehicle(''); setSupervisor(''); setEsProveedor(false);
       onChange();
     } catch (err) { setError(err.message); }
   }
@@ -411,7 +412,7 @@ function DriversPanel({ drivers, onChange }) {
             const u = userByDriverId[Number(d.id)];
             return (
               <tr key={d.id}>
-                <td>{d.name}</td><td>{d.phone}</td><td>{d.vehicle}</td><td>{d.supervisor}</td>
+                <td>{d.name}{Number(d.es_proveedor) === 1 && <span className="badge en_curso" style={{ marginLeft: 6 }}>Proveedor</span>}</td><td>{d.phone}</td><td>{d.vehicle}</td><td>{d.supervisor}</td>
                 <td>{u ? u.email : <span style={{ color: '#8894a6' }}>— sin login —</span>}</td>
                 <td><button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => setEditing(d)}>Editar</button></td>
               </tr>
@@ -425,6 +426,10 @@ function DriversPanel({ drivers, onChange }) {
         <div className="field"><label>Telefono</label><input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
         <div className="field"><label>Vehiculo / Movil</label><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} /></div>
         <div className="field"><label>Supervisor</label><input value={supervisor} onChange={(e) => setSupervisor(e.target.value)} /></div>
+        <label className="check-pill" style={{ height: 38 }}>
+          <input type="checkbox" checked={esProveedor} onChange={(e) => setEsProveedor(e.target.checked)} />
+          Proveedor
+        </label>
         <button className="btn btn-primary" type="submit" style={{ height: 38 }}>+ Agregar chofer</button>
       </form>
 
@@ -468,6 +473,7 @@ function DriverEditModal({ driver, onCancel, onSave }) {
   const [phone, setPhone] = useState(driver.phone || '');
   const [vehicle, setVehicle] = useState(driver.vehicle || '');
   const [supervisor, setSupervisor] = useState(driver.supervisor || '');
+  const [esProveedor, setEsProveedor] = useState(Number(driver.es_proveedor) === 1);
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
@@ -479,9 +485,13 @@ function DriverEditModal({ driver, onCancel, onSave }) {
           <div className="field"><label>Vehiculo / Movil</label><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} /></div>
         </div>
         <div className="field"><label>Supervisor</label><input value={supervisor} onChange={(e) => setSupervisor(e.target.value)} /></div>
+        <label className="check-pill" style={{ marginTop: 4 }}>
+          <input type="checkbox" checked={esProveedor} onChange={(e) => setEsProveedor(e.target.checked)} />
+          Es proveedor (habilita costos en sus rutas)
+        </label>
         <div className="modal-actions">
           <button className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
-          <button className="btn btn-primary" onClick={() => onSave({ name, phone, vehicle, supervisor })}>Guardar</button>
+          <button className="btn btn-primary" onClick={() => onSave({ name, phone, vehicle, supervisor, es_proveedor: esProveedor ? 1 : 0 })}>Guardar</button>
         </div>
       </div>
     </div>
