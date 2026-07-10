@@ -483,6 +483,13 @@ table.simple tr:hover td { background: var(--gray-row); }
 
 .empty-state { text-align: center; padding: 44px 16px; color: #8894a6; }
 
+/* Live map + location sharing */
+.live-map { width: 100%; height: 440px; border-radius: 10px; border: 1px solid var(--border); background: var(--gray-row); }
+.loc-share { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; box-shadow: var(--shadow-sm); }
+.loc-share .switch-row { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--navy); cursor: pointer; }
+.loc-share .switch-row input { width: 18px; height: 18px; }
+.loc-share .loc-status { font-size: 12.5px; color: var(--text-soft); }
+
 @media (max-width: 640px) {
   .navbar { padding: 8px 14px; }
   .main-content { padding: 16px 12px; }

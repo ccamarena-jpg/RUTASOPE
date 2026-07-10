@@ -25,6 +25,8 @@ export default function DriverView() {
         <p>Toca una parada para registrar salida, llegada, datos de entrega y adjuntar la guia.</p>
       </div>
 
+      <LocationShare />
+
       <div className="toolbar" style={{ marginBottom: 14, justifyContent: 'flex-end' }}>
         <button className="btn btn-primary" onClick={() => setShowViaje(true)}>+ Registrar viaje</button>
       </div>
@@ -206,6 +208,46 @@ function RouteCard({ route, onUpdated }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Comparte la ubicacion del chofer cada ~1 min mientras el interruptor este activo
+// y la app abierta. El navegador pausa el GPS si se bloquea la pantalla.
+function LocationShare() {
+  const [on, setOn] = useState(localStorage.getItem('ruteo_share_loc') === '1');
+  const [status, setStatus] = useState('');
+
+  useEffect(() => {
+    if (!on) return;
+    if (!('geolocation' in navigator)) { setStatus('Este dispositivo no soporta ubicacion.'); return; }
+    let stopped = false;
+    const send = () => {
+      navigator.geolocation.getCurrentPosition(
+        (p) => { api.sendLocation(p.coords.latitude, p.coords.longitude).then(() => { if (!stopped) setStatus('Compartiendo ubicacion...'); }).catch(() => {}); },
+        () => { if (!stopped) setStatus('No se pudo obtener la ubicacion (revisa el permiso).'); },
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+      );
+    };
+    send();
+    const id = setInterval(() => { if (!stopped) send(); }, 60000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [on]);
+
+  function toggle() {
+    const v = !on;
+    setOn(v);
+    localStorage.setItem('ruteo_share_loc', v ? '1' : '0');
+    if (!v) setStatus('');
+  }
+
+  return (
+    <div className="loc-share">
+      <label className="switch-row">
+        <input type="checkbox" checked={on} onChange={toggle} />
+        <span>📍 Compartir mi ubicacion en tiempo real</span>
+      </label>
+      {on && <span className="loc-status">{status || 'Activando...'}</span>}
     </div>
   );
 }

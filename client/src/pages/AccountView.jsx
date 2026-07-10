@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { toISODate } from '../utils/date';
+import LiveMap from '../components/LiveMap.jsx';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
 const TABS = [
   { id: 'projects', label: 'Proyectos' },
   { id: 'tracking', label: 'Seguimiento en tiempo real' },
+  { id: 'map', label: 'Mapa en vivo' },
 ];
 
 export default function AccountView() {
@@ -22,7 +24,9 @@ export default function AccountView() {
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      {tab === 'projects' ? <ProjectsPanel /> : <TrackingPanel />}
+      {tab === 'projects' && <ProjectsPanel />}
+      {tab === 'tracking' && <TrackingPanel />}
+      {tab === 'map' && <LiveMap />}
     </div>
   );
 }

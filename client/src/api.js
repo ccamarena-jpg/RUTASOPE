@@ -85,6 +85,9 @@ export const api = {
   getUsers: () => call('/users'),
   updateUser: (id, payload) => call(`/users/${id}`, { method: 'PUT', body: payload }),
 
+  sendLocation: (lat, lng) => call('/location', { method: 'POST', body: { lat, lng } }),
+  getLocations: () => call('/locations'),
+
   getAccounts: () => call('/accounts'),
   createAccount: (payload) => call('/accounts', { method: 'POST', body: payload }),
 

@@ -36,7 +36,7 @@ var CONFIG = {
 // Orden de columnas por pestana (fila 1 = encabezados).
 var SCHEMA = {
   users: ['id', 'email', 'password_hash', 'name', 'role', 'driver_id', 'account_id'],
-  drivers: ['id', 'name', 'phone', 'vehicle', 'supervisor', 'active'],
+  drivers: ['id', 'name', 'phone', 'vehicle', 'supervisor', 'active', 'last_lat', 'last_lng', 'last_loc_at'],
   accounts: ['id', 'name'],
   projects: ['id', 'name', 'account_id'],
   routes: [
@@ -47,7 +47,7 @@ var SCHEMA = {
     'tipo_movimiento', 'elementos_trasladados',
   ],
 };
-var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1 };
+var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1 };
 
 // ====== ENTRADAS HTTP ======
 function doGet() {
@@ -129,6 +129,10 @@ function handle(env) {
     if (seg.length === 1 && method === 'GET') return listUsers();
     if (seg.length === 2 && method === 'PUT') return updateUserLink(seg[1], body);
   }
+
+  // Ubicacion en tiempo real
+  if (path === '/location' && method === 'POST') { requireRole(user, ['chofer']); return saveLocation(user, body); }
+  if (path === '/locations' && method === 'GET') { requireRole(user, ['admin', 'cuenta']); return listLocations(); }
 
   if (seg[0] === 'routes') {
     if (seg.length === 1 && method === 'GET') return getRoutes(user, query);
@@ -401,6 +405,20 @@ function updateUserLink(id, b) {
   var rec = updateById('users', id, patch);
   if (!rec) throw apiError(404, 'Usuario no encontrado');
   return publicUser(rec);
+}
+
+// Ubicacion en tiempo real: el chofer guarda su posicion en su registro de chofer.
+function saveLocation(user, b) {
+  if (!user.driver_id) throw apiError(400, 'Tu usuario no tiene un chofer vinculado');
+  if (b.lat === undefined || b.lat === null || b.lng === undefined || b.lng === null) throw apiError(400, 'Faltan coordenadas');
+  updateById('drivers', user.driver_id, { last_lat: b.lat, last_lng: b.lng, last_loc_at: nowISO() });
+  return { ok: true };
+}
+// Admin/responsables leen la ultima posicion de cada chofer activo.
+function listLocations() {
+  return readAll('drivers').filter(function (d) { return d.active !== 0; }).map(function (d) {
+    return { driver_id: d.id, name: d.name, vehicle: d.vehicle, lat: d.last_lat, lng: d.last_lng, updated_at: d.last_loc_at };
+  });
 }
 
 function scopeFilter(user, routes) {

@@ -3,6 +3,7 @@ import { api } from '../api';
 import WeeklyCalendar from '../components/WeeklyCalendar.jsx';
 import RouteFormModal from '../components/RouteFormModal.jsx';
 import BulkUploadModal from '../components/BulkUploadModal.jsx';
+import LiveMap from '../components/LiveMap.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
@@ -10,6 +11,7 @@ import { downloadRoutesCsv } from '../utils/csv';
 const TABS = [
   { id: 'calendar', label: 'Calendario semanal' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
+  { id: 'map', label: 'Mapa en vivo' },
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
 ];
 
@@ -38,6 +40,7 @@ export default function AdminDashboard() {
       </div>
       {tab === 'calendar' && <CalendarTab drivers={drivers} accounts={accounts} />}
       {tab === 'today' && <TodayTab />}
+      {tab === 'map' && <LiveMap />}
       {tab === 'catalog' && <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />}
     </div>
   );
