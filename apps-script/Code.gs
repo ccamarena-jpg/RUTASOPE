@@ -695,7 +695,7 @@ function userDirectory() {
   return [
     // Admins (acceso total; Pamela asigna rutas)
     { email: 'ccamarena@ttaudit.com', name: 'Claudia Camarena', role: 'admin' },
-    { email: 'logistica@palmera.pe', name: 'Pamela - Logistica', role: 'admin' },
+    { email: 'logistica@palmera.pe', name: 'Pamela - Logistica', role: 'admin', password: 'Palmera2026' },
     { email: 'epezo@ttaudit.com', name: 'E. Pezo', role: 'admin' },
     { email: 'botero@ttaudit.com', name: 'Botero', role: 'admin' },
     { email: 'rgallo@ttaudit.com', name: 'R. Gallo', role: 'admin' },

@@ -98,7 +98,7 @@ export default function Login() {
               <div className="gis-hint">Personal TT Audit</div>
               <div ref={googleBtnRef} />
             </div>
-            <div className="login-divider"><span>o chofer con contrasena</span></div>
+            <div className="login-divider"><span>o con correo y contrasena</span></div>
           </>
         ) : null}
 
@@ -117,8 +117,8 @@ export default function Login() {
         </form>
 
         <div className="hint-users">
-          Personal (admin y responsables): usa <b>Continuar con Google</b>.<br />
-          Choferes: correo y contrasena (ej: <code>cris@ttaudit.com</code>).
+          Personal TT Audit: usa <b>Continuar con Google</b>.<br />
+          Choferes y usuarios externos: correo y contrasena.
         </div>
       </div>
     </div>
