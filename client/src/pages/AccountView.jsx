@@ -156,6 +156,7 @@ function TrackingPanel() {
                 {r.gr_firmada ? `GR firmada: ${r.gr_firmada}` : ''}
               </div>
             )}
+            {(r.costo_transporte != null && r.costo_transporte !== '') && <div className="meta">Costo de transporte: S/ {Number(r.costo_transporte).toFixed(2)}</div>}
             {r.comentario_chofer && <div className="meta">Comentario del chofer: {r.comentario_chofer}</div>}
             {r.motivo_no_realizada && <div className="meta">Motivo no realizada: {r.motivo_no_realizada}</div>}
             {r.foto_elementos_url && (

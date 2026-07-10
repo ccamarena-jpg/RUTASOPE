@@ -7,7 +7,8 @@ import RoutesMap from '../components/RoutesMap.jsx';
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
 export default function DriverView() {
-  const [date, setDate] = useState(toISODate(new Date()));
+  const todayIso = toISODate(new Date());
+  const [date, setDate] = useState(todayIso);
   const [routes, setRoutes] = useState([]);
   const [error, setError] = useState('');
 
@@ -29,7 +30,7 @@ export default function DriverView() {
       <LocationShare />
 
       <div className="driver-date-nav">
-        <button onClick={() => setDate(toISODate(addDays(new Date(date + 'T00:00:00'), -1)))}>&larr;</button>
+        <button disabled={date <= todayIso} title={date <= todayIso ? 'No puedes ver fechas pasadas' : ''} onClick={() => setDate(toISODate(addDays(new Date(date + 'T00:00:00'), -1)))}>&larr;</button>
         <span className="date-label">{new Date(date + 'T00:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
         <button onClick={() => setDate(toISODate(addDays(new Date(date + 'T00:00:00'), 1)))}>&rarr;</button>
       </div>

@@ -19,7 +19,6 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const [tipoMovimiento, setTipoMovimiento] = useState(initial?.tipo_movimiento || '');
   const [elementos, setElementos] = useState(initial?.elementos_trasladados || '');
   const [costoTransporte, setCostoTransporte] = useState(initial?.costo_transporte ?? '');
-  const [costoProveedor, setCostoProveedor] = useState(initial?.costo_proveedor ?? '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +44,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos, costo_transporte: isProveedor ? costoTransporte : '', costo_proveedor: isProveedor ? costoProveedor : '' };
+      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos, costo_transporte: isProveedor ? costoTransporte : '' };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -134,18 +133,9 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
             <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} rows={2} placeholder="Detalle de la mercancia..." />
           </div>
           {isProveedor && (
-            <div className="entrega-box">
-              <div className="entrega-title">Costos (proveedor)</div>
-              <div className="form-row">
-                <div className="field">
-                  <label>Costo de transporte (S/)</label>
-                  <input type="number" min="0" step="0.01" inputMode="decimal" value={costoTransporte} onChange={(e) => setCostoTransporte(e.target.value)} placeholder="0.00" />
-                </div>
-                <div className="field">
-                  <label>Costo proveedor (S/)</label>
-                  <input type="number" min="0" step="0.01" inputMode="decimal" value={costoProveedor} onChange={(e) => setCostoProveedor(e.target.value)} placeholder="0.00" />
-                </div>
-              </div>
+            <div className="field">
+              <label>Costo de transporte (S/) — solo proveedor</label>
+              <input type="number" min="0" step="0.01" inputMode="decimal" value={costoTransporte} onChange={(e) => setCostoTransporte(e.target.value)} placeholder="0.00" />
             </div>
           )}
           <div className="modal-actions">

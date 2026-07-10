@@ -56,11 +56,10 @@ export default function DashboardTab() {
     const byDay = {};
     const byWeek = {};
     const durations = [];
-    let costoT = 0, costoP = 0;
+    let costoT = 0;
 
     routes.forEach((r) => {
       costoT += Number(r.costo_transporte) || 0;
-      costoP += Number(r.costo_proveedor) || 0;
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
       const acc = r.account_name || 'Sin cuenta';
       byAccount[acc] = (byAccount[acc] || 0) + 1;
@@ -90,7 +89,7 @@ export default function DashboardTab() {
       dur: avg(v.dur),
     }));
 
-    return { byStatus, total: routes.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT, costoP };
+    return { byStatus, total: routes.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT };
   }, [routes, from, to]);
 
   const tiles = [
@@ -126,10 +125,10 @@ export default function DashboardTab() {
         </div>
         {loading && <div style={{ fontSize: 12, color: '#889', marginTop: 8 }}>Cargando...</div>}
         {m.durCount > 0 && <div style={{ fontSize: 12, color: '#889', marginTop: 8 }}>Tiempo de entrega calculado sobre {m.durCount} ruta(s) con salida y llegada marcadas.</div>}
-        {(m.costoT > 0 || m.costoP > 0) && (
-          <div style={{ marginTop: 12, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-            <div><span style={{ fontSize: 12.5, color: 'var(--text-soft)' }}>Costo de transporte (proveedores): </span><strong style={{ color: 'var(--navy)' }}>S/ {m.costoT.toFixed(2)}</strong></div>
-            <div><span style={{ fontSize: 12.5, color: 'var(--text-soft)' }}>Costo proveedor: </span><strong style={{ color: 'var(--navy)' }}>S/ {m.costoP.toFixed(2)}</strong></div>
+        {m.costoT > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <span style={{ fontSize: 12.5, color: 'var(--text-soft)' }}>Costo de transporte del periodo (proveedores): </span>
+            <strong style={{ color: 'var(--navy)' }}>S/ {m.costoT.toFixed(2)}</strong>
           </div>
         )}
       </div>

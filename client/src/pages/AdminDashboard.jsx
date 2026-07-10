@@ -291,7 +291,7 @@ function TodayTab() {
         <table className="simple">
           <thead>
             <tr>
-              <th>Hora</th><th>Chofer</th><th>Cuenta / Proyecto</th><th>Destino</th><th>Estado</th><th>Salida</th><th>Llegada</th><th>Bultos</th><th>GR</th><th>Foto</th><th>Guia</th>
+              <th>Hora</th><th>Chofer</th><th>Cuenta / Proyecto</th><th>Destino</th><th>Estado</th><th>Salida</th><th>Llegada</th><th>Costo</th><th>Bultos</th><th>GR</th><th>Foto</th><th>Guia</th>
             </tr>
           </thead>
           <tbody>
@@ -305,6 +305,7 @@ function TodayTab() {
                 <td><span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
                 <td>{r.hora_salida || '-'}</td>
                 <td>{r.hora_llegada || '-'}</td>
+                <td>{(r.costo_transporte != null && r.costo_transporte !== '') ? `S/ ${Number(r.costo_transporte).toFixed(2)}` : '-'}</td>
                 <td>{r.cantidad_bultos || '-'}</td>
                 <td>{r.gr_firmada || '-'}</td>
                 <td>{r.foto_elementos_url ? <a href={r.foto_elementos_url} target="_blank" rel="noreferrer">Ver</a> : '-'}</td>

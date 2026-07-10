@@ -27,7 +27,6 @@ const COLUMNS = [
   ['gr_firmada', 'GR firmada por cliente'],
   ['foto_elementos_url', 'Foto de elementos'],
   ['costo_transporte', 'Costo de transporte'],
-  ['costo_proveedor', 'Costo proveedor'],
   ['guia_url', 'Guia de remision'],
 ];
 

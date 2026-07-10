@@ -429,21 +429,36 @@ function scopeFilter(user, routes) {
   return routes;
 }
 
+// El costo es informacion interna: no se envia a los choferes.
+function stripCostos(routes) {
+  return routes.map(function (r) {
+    var o = Object.assign({}, r);
+    delete o.costo_transporte;
+    delete o.costo_proveedor;
+    return o;
+  });
+}
+
 function getRoutes(user, q) {
   var routes = scopeFilter(user, readAll('routes'));
+  // El chofer solo ve de hoy en adelante (no fechas pasadas).
+  if (user.role === 'chofer') { var t = todayISO(); routes = routes.filter(function (r) { return r.date >= t; }); }
   if (q.date) routes = routes.filter(function (r) { return r.date === q.date; });
   if (q.from && q.to) routes = routes.filter(function (r) { return r.date >= q.from && r.date <= q.to; });
   if (q.driver_id) routes = routes.filter(function (r) { return Number(r.driver_id) === Number(q.driver_id); });
   if (q.account_id) routes = routes.filter(function (r) { return Number(r.account_id) === Number(q.account_id); });
   routes.sort(function (a, b) { return (a.date + a.hour).localeCompare(b.date + b.hour); });
-  return enrichRoutes(routes, loadCatalogs());
+  var enriched = enrichRoutes(routes, loadCatalogs());
+  if (user.role === 'chofer') enriched = stripCostos(enriched);
+  return enriched;
 }
 
 function getRouteById(user, id) {
   var route = getById('routes', id);
   if (!route) throw apiError(404, 'Ruta no encontrada');
   if (user.role === 'chofer' && Number(route.driver_id) !== Number(user.driver_id)) throw apiError(403, 'No autorizado');
-  return enrichOne(route);
+  var one = enrichOne(route);
+  return user.role === 'chofer' ? stripCostos([one])[0] : one;
 }
 
 function createRoute(user, b) {
