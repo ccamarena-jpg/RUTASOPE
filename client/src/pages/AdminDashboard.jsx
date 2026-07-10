@@ -7,6 +7,7 @@ import LiveMap from '../components/LiveMap.jsx';
 import MovimientoPicker from '../components/MovimientoPicker.jsx';
 import AddressPicker from '../components/AddressPicker.jsx';
 import DashboardTab from '../components/DashboardTab.jsx';
+import MonthlyCalendar from '../components/MonthlyCalendar.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
@@ -14,6 +15,7 @@ import { downloadRoutesCsv } from '../utils/csv';
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'calendar', label: 'Calendario semanal' },
+  { id: 'month', label: 'Calendario mensual' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
   { id: 'map', label: 'Mapa en vivo' },
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
@@ -45,6 +47,7 @@ export default function AdminDashboard() {
       </div>
       {tab === 'dashboard' && <DashboardTab />}
       {tab === 'calendar' && <CalendarTab drivers={drivers} accounts={accounts} />}
+      {tab === 'month' && <MonthlyCalendar />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
       {tab === 'catalog' && (
