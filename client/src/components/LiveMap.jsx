@@ -1,27 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { loadGoogleMaps, MAPS_KEY } from '../utils/gmaps';
 
-const MAPS_KEY =
-  (import.meta.env && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) ||
-  'AIzaSyC07b6izx5TdLMceKwmw8-G9UhFfoVNEyU';
 const LIMA = { lat: -12.0464, lng: -77.0428 };
-
-function loadMaps() {
-  return new Promise((resolve, reject) => {
-    if (window.google && window.google.maps) return resolve();
-    const id = 'gmaps-script';
-    const existing = document.getElementById(id);
-    if (existing) { existing.addEventListener('load', () => resolve()); return; }
-    const s = document.createElement('script');
-    s.id = id;
-    s.async = true;
-    s.defer = true;
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}`;
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('No se pudo cargar Google Maps. Revisa la API key.'));
-    document.head.appendChild(s);
-  });
-}
 
 function fmt(dt) {
   if (!dt) return 'sin datos';
@@ -40,7 +21,7 @@ export default function LiveMap() {
   useEffect(() => {
     if (!MAPS_KEY) { setError('Falta configurar la API key de Google Maps (VITE_GOOGLE_MAPS_API_KEY).'); return; }
     let cancelled = false;
-    loadMaps().then(() => {
+    loadGoogleMaps().then(() => {
       if (cancelled || !mapEl.current) return;
       mapObj.current = new window.google.maps.Map(mapEl.current, { center: LIMA, zoom: 11, mapTypeControl: false, streetViewControl: false });
       setReady(true);

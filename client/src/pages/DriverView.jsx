@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { toISODate, addDays } from '../utils/date';
 import MovimientoPicker from '../components/MovimientoPicker.jsx';
+import RoutesMap from '../components/RoutesMap.jsx';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
@@ -36,7 +37,13 @@ export default function DriverView() {
       {routes.length === 0 ? (
         <div className="empty-state">No tienes rutas asignadas para este dia.</div>
       ) : (
-        routes.map((r) => <RouteCard key={r.id} route={r} onUpdated={load} />)
+        <>
+          <div className="card" style={{ padding: 14 }}>
+            <div className="section-title" style={{ marginBottom: 10 }}><span className="st-icon">🗺️</span> Mapa de mis paradas</div>
+            <RoutesMap routes={routes} />
+          </div>
+          {routes.map((r) => <RouteCard key={r.id} route={r} onUpdated={load} />)}
+        </>
       )}
     </div>
   );

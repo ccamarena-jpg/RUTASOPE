@@ -5,11 +5,14 @@ import RouteFormModal from '../components/RouteFormModal.jsx';
 import BulkUploadModal from '../components/BulkUploadModal.jsx';
 import LiveMap from '../components/LiveMap.jsx';
 import MovimientoPicker from '../components/MovimientoPicker.jsx';
+import AddressPicker from '../components/AddressPicker.jsx';
+import DashboardTab from '../components/DashboardTab.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
 
 const TABS = [
+  { id: 'dashboard', label: 'Dashboard' },
   { id: 'calendar', label: 'Calendario semanal' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
   { id: 'map', label: 'Mapa en vivo' },
@@ -17,7 +20,7 @@ const TABS = [
 ];
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState('calendar');
+  const [tab, setTab] = useState('dashboard');
   const [drivers, setDrivers] = useState([]);
   const [accounts, setAccounts] = useState([]);
 
@@ -39,6 +42,7 @@ export default function AdminDashboard() {
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
+      {tab === 'dashboard' && <DashboardTab />}
       {tab === 'calendar' && <CalendarTab drivers={drivers} accounts={accounts} />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
@@ -123,8 +127,15 @@ function ViajeModal({ drivers, defaultDriverId, onClose, onSaved }) {
   const [destino, setDestino] = useState('');
   const [elementos, setElementos] = useState('');
   const [cantidadBultos, setCantidadBultos] = useState('');
+  const [lat, setLat] = useState(null);
+  const [lng, setLng] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  function handlePick({ lat: la, lng: ln, address }) {
+    setLat(la); setLng(ln);
+    if (!destino) setDestino(address);
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -134,7 +145,7 @@ function ViajeModal({ drivers, defaultDriverId, onClose, onSaved }) {
     try {
       await api.registrarViaje({
         driver_id: Number(driverId), destino: destino.trim(), tipo_movimiento: tipoMovimiento,
-        elementos_trasladados: elementos, cantidad_bultos: cantidadBultos,
+        elementos_trasladados: elementos, cantidad_bultos: cantidadBultos, lat, lng,
       });
       onSaved();
     } catch (err) { setError(err.message); } finally { setSaving(false); }
@@ -155,6 +166,13 @@ function ViajeModal({ drivers, defaultDriverId, onClose, onSaved }) {
           <div className="field">
             <label>Tipo de movimiento</label>
             <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
+          </div>
+          <div className="field">
+            <label>Ubicacion (buscar en el mapa)</label>
+            <AddressPicker onPick={handlePick} />
+            <div style={{ fontSize: 12, color: lat != null ? 'var(--green)' : 'var(--text-soft)', marginTop: 4 }}>
+              {lat != null ? `📍 Ubicacion cargada (${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})` : 'Opcional: elige una sugerencia para ubicar el viaje en el mapa.'}
+            </div>
           </div>
           <div className="field">
             <label>Destino</label>

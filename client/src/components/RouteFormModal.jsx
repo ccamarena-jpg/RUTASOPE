@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api';
 import { HOURS } from '../utils/date';
+import AddressPicker from './AddressPicker.jsx';
 
 export default function RouteFormModal({ initial, drivers, accounts, onClose, onSaved, onDeleted }) {
   const isEdit = Boolean(initial?.id);
@@ -12,8 +13,15 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const [projects, setProjects] = useState([]);
   const [destino, setDestino] = useState(initial?.destino || '');
   const [motivo, setMotivo] = useState(initial?.motivo || '');
+  const [lat, setLat] = useState(initial?.lat ?? null);
+  const [lng, setLng] = useState(initial?.lng ?? null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  function handlePick({ lat: la, lng: ln, address }) {
+    setLat(la); setLng(ln);
+    if (!destino) setDestino(address);
+  }
 
   useEffect(() => {
     if (!accountId) { setProjects([]); return; }
@@ -29,7 +37,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), project_id: projectId ? Number(projectId) : null, destino, motivo };
+      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), project_id: projectId ? Number(projectId) : null, destino, motivo, lat, lng };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -87,6 +95,13 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
                 <option value="">Sin proyecto</option>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+            </div>
+          </div>
+          <div className="field">
+            <label>Ubicacion (buscar en el mapa)</label>
+            <AddressPicker onPick={handlePick} defaultValue={initial?.destino || ''} />
+            <div style={{ fontSize: 12, color: lat != null && lat !== '' ? 'var(--green)' : 'var(--text-soft)', marginTop: 4 }}>
+              {lat != null && lat !== '' ? `📍 Ubicacion cargada (${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})` : 'Escribe la direccion y elige una sugerencia para cargar la ubicacion.'}
             </div>
           </div>
           <div className="field">
