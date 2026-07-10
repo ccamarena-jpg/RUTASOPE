@@ -101,5 +101,7 @@ export const api = {
   driverLlegada: (id, hora) => call(`/routes/${id}/llegada`, { method: 'POST', body: { hora } }),
   driverComentario: (id, comentario) => call(`/routes/${id}/comentario`, { method: 'POST', body: { comentario } }),
   driverNoRealizada: (id, motivo) => call(`/routes/${id}/no-realizada`, { method: 'POST', body: { motivo } }),
+  driverEntrega: (id, payload) => call(`/routes/${id}/entrega`, { method: 'POST', body: payload }),
+  driverFotoElementos: (id, file) => call(`/routes/${id}/foto-elementos`, { method: 'POST', file }),
   driverGuia: (id, file) => call(`/routes/${id}/guia`, { method: 'POST', file }),
 };

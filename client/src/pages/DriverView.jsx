@@ -44,6 +44,8 @@ function RouteCard({ route, onUpdated }) {
   const [error, setError] = useState('');
   const [showNoReal, setShowNoReal] = useState(false);
   const [motivoNoReal, setMotivoNoReal] = useState('');
+  const [cantidadBultos, setCantidadBultos] = useState(route.cantidad_bultos || '');
+  const [grFirmada, setGrFirmada] = useState(route.gr_firmada || '');
 
   async function marcarSalida() {
     setBusy(true); setError('');
@@ -77,6 +79,24 @@ function RouteCard({ route, onUpdated }) {
       setShowNoReal(false); setMotivoNoReal('');
       onUpdated();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function guardarEntrega() {
+    setBusy(true); setError('');
+    try {
+      await api.driverEntrega(route.id, { cantidad_bultos: cantidadBultos, gr_firmada: grFirmada });
+      onUpdated();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  }
+
+  async function subirFotoElementos(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBusy(true); setError('');
+    try {
+      await api.driverFotoElementos(route.id, file);
+      onUpdated();
+    } catch (err) { setError(err.message); } finally { setBusy(false); }
   }
 
   async function subirGuia(e) {
@@ -143,6 +163,40 @@ function RouteCard({ route, onUpdated }) {
       />
       <div className="actions">
         <button className="btn btn-secondary" disabled={busy} onClick={guardarComentario}>Guardar comentario</button>
+      </div>
+
+      <div className="entrega-box">
+        <div className="entrega-title">Datos de entrega</div>
+        <div className="form-row">
+          <div className="field">
+            <label>Cantidad de bultos (paquetes/cajas)</label>
+            <input type="number" min="0" inputMode="numeric" value={cantidadBultos} onChange={(e) => setCantidadBultos(e.target.value)} placeholder="Ej: 5" />
+          </div>
+          <div className="field">
+            <label>¿GR firmada por cliente?</label>
+            <select value={grFirmada} onChange={(e) => setGrFirmada(e.target.value)}>
+              <option value="">Seleccionar...</option>
+              <option value="Si">Si</option>
+              <option value="No">No</option>
+              <option value="Pendiente">Pendiente</option>
+            </select>
+          </div>
+        </div>
+        <div className="actions">
+          <button className="btn btn-primary" disabled={busy} onClick={guardarEntrega}>Guardar datos de entrega</button>
+        </div>
+
+        <div className="actions" style={{ marginTop: 10 }}>
+          <label className="btn btn-secondary" style={{ margin: 0 }}>
+            Foto de elementos entregados/recogidos
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={subirFotoElementos} disabled={busy} />
+          </label>
+        </div>
+        {route.foto_elementos_url && (
+          <div className="file-info">
+            Foto de elementos: <a href={route.foto_elementos_url} target="_blank" rel="noreferrer">ver foto</a>
+          </div>
+        )}
       </div>
 
       <div className="actions" style={{ marginTop: 10 }}>

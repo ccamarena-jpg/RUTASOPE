@@ -145,8 +145,20 @@ function TrackingPanel() {
               <span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span>
             </div>
             <div className="meta">Salida: {r.hora_salida || '-'} &nbsp;|&nbsp; Llegada: {r.hora_llegada || '-'}</div>
+            {(r.cantidad_bultos || r.gr_firmada) && (
+              <div className="meta">
+                {r.cantidad_bultos ? `Bultos: ${r.cantidad_bultos}` : ''}
+                {r.cantidad_bultos && r.gr_firmada ? ' · ' : ''}
+                {r.gr_firmada ? `GR firmada: ${r.gr_firmada}` : ''}
+              </div>
+            )}
             {r.comentario_chofer && <div className="meta">Comentario del chofer: {r.comentario_chofer}</div>}
             {r.motivo_no_realizada && <div className="meta">Motivo no realizada: {r.motivo_no_realizada}</div>}
+            {r.foto_elementos_url && (
+              <div className="file-info">
+                Foto de elementos: <a href={r.foto_elementos_url} target="_blank" rel="noreferrer">ver foto</a>
+              </div>
+            )}
             {r.guia_url && (
               <div className="file-info">
                 Guia de remision: <a href={r.guia_url} target="_blank" rel="noreferrer">ver documento</a>

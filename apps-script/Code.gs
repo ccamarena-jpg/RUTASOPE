@@ -43,6 +43,7 @@ var SCHEMA = {
     'id', 'date', 'hour', 'driver_id', 'account_id', 'project_id', 'destino', 'motivo',
     'status', 'hora_salida', 'hora_llegada', 'comentario_chofer', 'motivo_no_realizada',
     'guia_url', 'created_by', 'updated_at',
+    'cantidad_bultos', 'gr_firmada', 'foto_elementos_url',
   ],
 };
 var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1 };
@@ -142,6 +143,8 @@ function handle(env) {
       if (action === 'llegada') return choferLlegada(user, seg[1], body);
       if (action === 'comentario') return choferComentario(user, seg[1], body);
       if (action === 'no-realizada') return choferNoRealizada(user, seg[1], body);
+      if (action === 'entrega') return choferEntrega(user, seg[1], body);
+      if (action === 'foto-elementos') return choferFotoElementos(user, seg[1], body);
       if (action === 'guia') return choferGuia(user, seg[1], body);
     }
   }
@@ -430,6 +433,7 @@ function createRoute(user, b) {
     date: b.date, hour: b.hour, driver_id: b.driver_id, account_id: b.account_id, project_id: b.project_id || null,
     destino: b.destino, motivo: b.motivo || '', status: 'pendiente', hora_salida: '', hora_llegada: '',
     comentario_chofer: '', motivo_no_realizada: '', guia_url: '', created_by: user.email, updated_at: nowISO(),
+    cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '',
   });
   return enrichOne(rec);
 }
@@ -527,6 +531,23 @@ function choferGuia(user, id, b) {
   if (!b.file || !b.file.dataBase64) throw apiError(400, 'Archivo requerido');
   var url = uploadGuia(b.file.dataBase64, b.file.name, b.file.mimeType);
   return enrichOne(updateById('routes', id, { guia_url: url, updated_at: nowISO() }));
+}
+
+// Datos de entrega: cantidad de bultos y si la GR fue firmada por el cliente.
+function choferEntrega(user, id, b) {
+  ensureOwnRoute(user, id);
+  var patch = { updated_at: nowISO() };
+  if (b.cantidad_bultos !== undefined) patch.cantidad_bultos = b.cantidad_bultos || '';
+  if (b.gr_firmada !== undefined) patch.gr_firmada = b.gr_firmada || '';
+  return enrichOne(updateById('routes', id, patch));
+}
+
+// Foto de los elementos entregados/recogidos (se sube a Drive, aparte de la guia).
+function choferFotoElementos(user, id, b) {
+  ensureOwnRoute(user, id);
+  if (!b.file || !b.file.dataBase64) throw apiError(400, 'Archivo requerido');
+  var url = uploadGuia(b.file.dataBase64, b.file.name, b.file.mimeType);
+  return enrichOne(updateById('routes', id, { foto_elementos_url: url, updated_at: nowISO() }));
 }
 
 function uploadGuia(dataB64, name, mime) {
