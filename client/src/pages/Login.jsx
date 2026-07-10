@@ -104,8 +104,8 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="field">
-            <label>Correo</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+            <label>Correo o usuario</label>
+            <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
           </div>
           <div className="field">
             <label>Contrasena</label>

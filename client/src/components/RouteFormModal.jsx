@@ -10,7 +10,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const [hour, setHour] = useState(initial?.hour || HOURS[0]);
   const [driverId, setDriverId] = useState(initial?.driver_id || drivers[0]?.id || '');
   const [accountId, setAccountId] = useState(initial?.account_id || accounts[0]?.id || '');
-  const [projectId, setProjectId] = useState(initial?.project_id || '');
+  const [proyecto, setProyecto] = useState(initial?.project_name || '');
   const [projects, setProjects] = useState([]);
   const [destino, setDestino] = useState(initial?.destino || '');
   const [motivo, setMotivo] = useState(initial?.motivo || '');
@@ -40,7 +40,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), project_id: projectId ? Number(projectId) : null, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos };
+      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -94,10 +94,15 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
             </div>
             <div className="field">
               <label>Proyecto</label>
-              <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-                <option value="">Sin proyecto</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+              <input
+                list="proyectos-sugeridos"
+                value={proyecto}
+                onChange={(e) => setProyecto(e.target.value)}
+                placeholder="Escribe el proyecto..."
+              />
+              <datalist id="proyectos-sugeridos">
+                {projects.map((p) => <option key={p.id} value={p.name} />)}
+              </datalist>
             </div>
           </div>
           <div className="field">

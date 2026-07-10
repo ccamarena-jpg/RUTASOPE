@@ -44,7 +44,7 @@ var SCHEMA = {
     'status', 'hora_salida', 'hora_llegada', 'comentario_chofer', 'motivo_no_realizada',
     'guia_url', 'created_by', 'updated_at',
     'cantidad_bultos', 'gr_firmada', 'foto_elementos_url',
-    'tipo_movimiento', 'elementos_trasladados', 'lat', 'lng',
+    'tipo_movimiento', 'elementos_trasladados', 'lat', 'lng', 'proyecto',
   ],
 };
 var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1 };
@@ -369,7 +369,7 @@ function enrichRoutes(routes, c) {
     o.vehicle = d ? d.vehicle : null;
     o.supervisor = d ? d.supervisor : null;
     o.account_name = a ? a.name : null;
-    o.project_name = p ? p.name : null;
+    o.project_name = (r.proyecto && r.proyecto !== '') ? r.proyecto : (p ? p.name : null);
     return o;
   });
 }
@@ -455,7 +455,7 @@ function createRoute(user, b) {
     comentario_chofer: '', motivo_no_realizada: '', guia_url: '', created_by: user.email, updated_at: nowISO(),
     cantidad_bultos: '', gr_firmada: '', foto_elementos_url: '',
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
-    lat: b.lat || '', lng: b.lng || '',
+    lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
   });
   return enrichOne(rec);
 }
@@ -469,6 +469,7 @@ function updateRoute(id, b) {
     destino: def(b.destino, ex.destino), motivo: def(b.motivo, ex.motivo),
     tipo_movimiento: def(b.tipo_movimiento, ex.tipo_movimiento),
     elementos_trasladados: def(b.elementos_trasladados, ex.elementos_trasladados),
+    proyecto: def(b.proyecto, ex.proyecto),
     lat: def(b.lat, ex.lat), lng: def(b.lng, ex.lng), updated_at: nowISO(),
   };
   return enrichOne(updateById('routes', id, patch));
@@ -581,7 +582,7 @@ function createViaje(user, b) {
     guia_url: '', created_by: user.email, updated_at: nowISO(),
     cantidad_bultos: b.cantidad_bultos || '', gr_firmada: b.gr_firmada || '', foto_elementos_url: '',
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
-    lat: b.lat || '', lng: b.lng || '',
+    lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
   });
   return enrichOne(rec);
 }
@@ -705,8 +706,10 @@ function userDirectory() {
     { email: 'dolaguibel@ttaudit.com', name: 'D. Olaguibel', role: 'cuenta' },
     { email: 'mcarhuallanqui@ttaudit.com', name: 'M. Carhuallanqui', role: 'cuenta' },
     { email: 'ghidalgo@ttaudit.com', name: 'G. Hidalgo', role: 'cuenta' },
-    // Choferes (correo + contrasena)
+    // Choferes / externos (correo o usuario + contrasena)
     { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Cris', phone: '', vehicle: '', supervisor: 'Pamela' } },
+    { email: 'ayronn@ttaudit.com', name: 'Ayronn', role: 'chofer', password: 'Ayronn', driver: { name: 'Ayronn', supervisor: 'Pamela' } },
+    { email: 'proveedor1', name: 'Proveedor 1', role: 'chofer', password: 'Proveedor1', driver: { name: 'Proveedor 1', supervisor: 'Pamela' } },
   ];
 }
 
