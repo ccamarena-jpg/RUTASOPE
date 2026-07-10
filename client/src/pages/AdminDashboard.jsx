@@ -229,6 +229,16 @@ function DriversPanel({ drivers, onChange }) {
   const [vehicle, setVehicle] = useState('');
   const [supervisor, setSupervisor] = useState('');
   const [error, setError] = useState('');
+  const [users, setUsers] = useState([]);
+  const [editing, setEditing] = useState(null);
+
+  const loadUsers = useCallback(() => { api.getUsers().then(setUsers).catch(() => {}); }, []);
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const choferUsers = users.filter((u) => u.role === 'chofer');
+  const driverIds = new Set(drivers.map((d) => Number(d.id)));
+  const userByDriverId = {};
+  choferUsers.forEach((u) => { if (u.driver_id) userByDriverId[Number(u.driver_id)] = u; });
 
   async function add(e) {
     e.preventDefault();
@@ -240,18 +250,44 @@ function DriversPanel({ drivers, onChange }) {
     } catch (err) { setError(err.message); }
   }
 
+  async function relink(userId, driverId) {
+    setError('');
+    try {
+      await api.updateUser(userId, { driver_id: driverId ? Number(driverId) : '' });
+      loadUsers();
+    } catch (err) { setError(err.message); }
+  }
+
+  async function saveDriver(patch) {
+    setError('');
+    try {
+      await api.updateDriver(editing.id, patch);
+      setEditing(null);
+      onChange();
+    } catch (err) { setError(err.message); }
+  }
+
   return (
     <div className="card">
-      <div className="card-header"><h3>🚚 Choferes</h3></div>
+      <div className="card-header"><h3>🚚 Choferes y accesos</h3></div>
       {error && <div className="error-msg">{error}</div>}
+
       <table className="simple" style={{ marginBottom: 14 }}>
-        <thead><tr><th>Nombre</th><th>Telefono</th><th>Vehiculo</th><th>Supervisor</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Telefono</th><th>Vehiculo</th><th>Supervisor</th><th>Login vinculado</th><th></th></tr></thead>
         <tbody>
-          {drivers.map((d) => (
-            <tr key={d.id}><td>{d.name}</td><td>{d.phone}</td><td>{d.vehicle}</td><td>{d.supervisor}</td></tr>
-          ))}
+          {drivers.map((d) => {
+            const u = userByDriverId[Number(d.id)];
+            return (
+              <tr key={d.id}>
+                <td>{d.name}</td><td>{d.phone}</td><td>{d.vehicle}</td><td>{d.supervisor}</td>
+                <td>{u ? u.email : <span style={{ color: '#8894a6' }}>— sin login —</span>}</td>
+                <td><button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => setEditing(d)}>Editar</button></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+
       <form onSubmit={add} className="form-row" style={{ alignItems: 'end' }}>
         <div className="field"><label>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} required /></div>
         <div className="field"><label>Telefono</label><input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
@@ -259,6 +295,63 @@ function DriversPanel({ drivers, onChange }) {
         <div className="field"><label>Supervisor</label><input value={supervisor} onChange={(e) => setSupervisor(e.target.value)} /></div>
         <button className="btn btn-primary" type="submit" style={{ height: 38 }}>+ Agregar chofer</button>
       </form>
+
+      <div className="section-title" style={{ marginTop: 22 }}><span className="st-icon">🔗</span> Accesos de chofer (login → chofer)</div>
+      <p style={{ color: '#8894a6', fontSize: 13, marginTop: -8 }}>
+        Cada login de chofer debe apuntar a un chofer de la lista de arriba. Si ves ⚠️, ese login quedo sin chofer valido (por ejemplo si borraste el chofer). Selecciona el correcto.
+      </p>
+      {choferUsers.length === 0 ? (
+        <div className="empty-state" style={{ padding: '16px 0' }}>No hay usuarios con rol chofer.</div>
+      ) : (
+        <table className="simple">
+          <thead><tr><th>Login (correo)</th><th>Nombre</th><th>Chofer vinculado</th></tr></thead>
+          <tbody>
+            {choferUsers.map((u) => {
+              const missing = u.driver_id && !driverIds.has(Number(u.driver_id));
+              return (
+                <tr key={u.id}>
+                  <td>{u.email}</td>
+                  <td>{u.name}</td>
+                  <td>
+                    {missing && <span title="El chofer vinculado ya no existe" style={{ color: 'var(--red)', marginRight: 6 }}>⚠️</span>}
+                    <select value={missing ? '' : (u.driver_id || '')} onChange={(e) => relink(u.id, e.target.value)}>
+                      <option value="">— sin asignar —</option>
+                      {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle ? ` (${d.vehicle})` : ''}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+
+      {editing && <DriverEditModal driver={editing} onCancel={() => setEditing(null)} onSave={saveDriver} />}
+    </div>
+  );
+}
+
+function DriverEditModal({ driver, onCancel, onSave }) {
+  const [name, setName] = useState(driver.name || '');
+  const [phone, setPhone] = useState(driver.phone || '');
+  const [vehicle, setVehicle] = useState(driver.vehicle || '');
+  const [supervisor, setSupervisor] = useState(driver.supervisor || '');
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>Editar chofer</h3>
+        <div className="field"><label>Nombre</label><input value={name} onChange={(e) => setName(e.target.value)} /></div>
+        <div className="form-row">
+          <div className="field"><label>Telefono</label><input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
+          <div className="field"><label>Vehiculo / Movil</label><input value={vehicle} onChange={(e) => setVehicle(e.target.value)} /></div>
+        </div>
+        <div className="field"><label>Supervisor</label><input value={supervisor} onChange={(e) => setSupervisor(e.target.value)} /></div>
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onCancel}>Cancelar</button>
+          <button className="btn btn-primary" onClick={() => onSave({ name, phone, vehicle, supervisor })}>Guardar</button>
+        </div>
+      </div>
     </div>
   );
 }

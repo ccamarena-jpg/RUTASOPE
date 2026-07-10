@@ -122,6 +122,12 @@ function handle(env) {
     }
   }
 
+  if (seg[0] === 'users') {
+    requireRole(user, ['admin']);
+    if (seg.length === 1 && method === 'GET') return listUsers();
+    if (seg.length === 2 && method === 'PUT') return updateUserLink(seg[1], body);
+  }
+
   if (seg[0] === 'routes') {
     if (seg.length === 1 && method === 'GET') return getRoutes(user, query);
     if (seg.length === 1 && method === 'POST') { requireRole(user, ['admin']); return createRoute(user, body); }
@@ -369,6 +375,27 @@ function updateDriver(id, b) {
   var rec = updateById('drivers', id, patch);
   if (!rec) throw apiError(404, 'Chofer no encontrado');
   return rec;
+}
+
+// Usuarios (solo admin). Nunca se expone el password_hash.
+function publicUser(u) {
+  return { id: u.id, email: u.email, name: u.name, role: u.role, driver_id: u.driver_id, account_id: u.account_id };
+}
+function listUsers() {
+  var users = readAll('users').map(publicUser);
+  users.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+  return users;
+}
+// Solo permite cambiar el vinculo (driver_id / account_id) y el nombre. No toca
+// email, rol ni contrasena.
+function updateUserLink(id, b) {
+  var patch = {};
+  if (b.driver_id !== undefined) patch.driver_id = (b.driver_id === '' || b.driver_id === null) ? '' : b.driver_id;
+  if (b.account_id !== undefined) patch.account_id = (b.account_id === '' || b.account_id === null) ? '' : b.account_id;
+  if (b.name !== undefined && b.name !== '') patch.name = b.name;
+  var rec = updateById('users', id, patch);
+  if (!rec) throw apiError(404, 'Usuario no encontrado');
+  return publicUser(rec);
 }
 
 function scopeFilter(user, routes) {
