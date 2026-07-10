@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
 import { toISODate, addDays } from '../utils/date';
+import MovimientoPicker from '../components/MovimientoPicker.jsx';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
@@ -8,7 +9,6 @@ export default function DriverView() {
   const [date, setDate] = useState(toISODate(new Date()));
   const [routes, setRoutes] = useState([]);
   const [error, setError] = useState('');
-  const [showViaje, setShowViaje] = useState(false);
 
   const load = useCallback(() => {
     api.getRoutes({ date }).then(setRoutes).catch((e) => setError(e.message));
@@ -27,10 +27,6 @@ export default function DriverView() {
 
       <LocationShare />
 
-      <div className="toolbar" style={{ marginBottom: 14, justifyContent: 'flex-end' }}>
-        <button className="btn btn-primary" onClick={() => setShowViaje(true)}>+ Registrar viaje</button>
-      </div>
-
       <div className="driver-date-nav">
         <button onClick={() => setDate(toISODate(addDays(new Date(date + 'T00:00:00'), -1)))}>&larr;</button>
         <span className="date-label">{new Date(date + 'T00:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
@@ -42,8 +38,6 @@ export default function DriverView() {
       ) : (
         routes.map((r) => <RouteCard key={r.id} route={r} onUpdated={load} />)
       )}
-
-      {showViaje && <ViajeModal onClose={() => setShowViaje(false)} onSaved={() => { setShowViaje(false); load(); }} />}
     </div>
   );
 }
@@ -252,75 +246,3 @@ function LocationShare() {
   );
 }
 
-// Selector de tipo de movimiento (Entrega / Recojo), permite uno o ambos.
-function MovimientoPicker({ value, onChange }) {
-  const set = new Set((value || '').split(',').map((s) => s.trim()).filter(Boolean));
-  function toggle(opt) {
-    const next = new Set(set);
-    if (next.has(opt)) next.delete(opt); else next.add(opt);
-    onChange(['Entrega', 'Recojo'].filter((o) => next.has(o)).join(', '));
-  }
-  return (
-    <div className="check-row">
-      {['Entrega', 'Recojo'].map((opt) => (
-        <label key={opt} className={`check-pill ${set.has(opt) ? 'on' : ''}`}>
-          <input type="checkbox" checked={set.has(opt)} onChange={() => toggle(opt)} />
-          {opt}
-        </label>
-      ))}
-    </div>
-  );
-}
-
-function ViajeModal({ onClose, onSaved }) {
-  const [tipoMovimiento, setTipoMovimiento] = useState('');
-  const [destino, setDestino] = useState('');
-  const [elementos, setElementos] = useState('');
-  const [cantidadBultos, setCantidadBultos] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function submit(e) {
-    e.preventDefault();
-    if (!destino.trim()) { setError('Indica el destino del viaje'); return; }
-    setSaving(true); setError('');
-    try {
-      await api.registrarViaje({
-        destino: destino.trim(), tipo_movimiento: tipoMovimiento,
-        elementos_trasladados: elementos, cantidad_bultos: cantidadBultos,
-      });
-      onSaved();
-    } catch (err) { setError(err.message); } finally { setSaving(false); }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Registrar viaje</h3>
-        {error && <div className="error-msg">{error}</div>}
-        <form onSubmit={submit}>
-          <div className="field">
-            <label>Tipo de movimiento</label>
-            <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
-          </div>
-          <div className="field">
-            <label>Destino</label>
-            <input value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="Ej: Almacen Chiclin" required />
-          </div>
-          <div className="field">
-            <label>Elementos trasladados (detalle de la mercancia)</label>
-            <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} placeholder="Detalle de la mercancia..." />
-          </div>
-          <div className="field">
-            <label>Cantidad de bultos (paquetes/cajas)</label>
-            <input type="number" min="0" inputMode="numeric" value={cantidadBultos} onChange={(e) => setCantidadBultos(e.target.value)} placeholder="Ej: 5" />
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Guardando...' : 'Registrar viaje'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
