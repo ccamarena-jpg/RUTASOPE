@@ -26,6 +26,14 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const selDriver = drivers.find((d) => Number(d.id) === Number(driverId));
   const isProveedor = !!(selDriver && Number(selDriver.es_proveedor) === 1);
 
+  function waLink() {
+    const raw = ((selDriver && selDriver.phone) || '').replace(/\D/g, '');
+    if (!raw) return null;
+    const full = raw.length <= 9 ? '51' + raw : raw; // Peru
+    const msg = `Hola ${selDriver.name}, tienes una ruta asignada el ${date} a las ${hour}. Destino: ${destino}.` + (motivo ? ` Detalle: ${motivo}.` : '');
+    return `https://wa.me/${full}?text=${encodeURIComponent(msg)}`;
+  }
+
   function handlePick({ lat: la, lng: ln, address }) {
     setLat(la); setLng(ln);
     if (!destino) setDestino(address);
@@ -145,6 +153,11 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
               <label>Costo de transporte (S/) — solo proveedor</label>
               <input type="number" min="0" step="0.01" inputMode="decimal" value={costoTransporte} onChange={(e) => setCostoTransporte(e.target.value)} placeholder="0.00" />
             </div>
+          )}
+          {isEdit && (
+            waLink()
+              ? <a className="btn btn-success btn-block" style={{ marginBottom: 10 }} href={waLink()} target="_blank" rel="noreferrer">📲 Avisar al chofer por WhatsApp</a>
+              : <div style={{ fontSize: 12, color: 'var(--text-soft)', marginBottom: 10 }}>Para avisar por WhatsApp, agrega el telefono del chofer (en Choferes / Cuentas / Proyectos).</div>
           )}
           <div className="modal-actions">
             {isEdit && <button type="button" className="btn btn-danger" onClick={handleDelete}>Eliminar</button>}

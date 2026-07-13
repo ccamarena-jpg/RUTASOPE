@@ -6,6 +6,7 @@ import BulkUploadModal from '../components/BulkUploadModal.jsx';
 import LiveMap from '../components/LiveMap.jsx';
 import DashboardTab from '../components/DashboardTab.jsx';
 import MonthlyCalendar from '../components/MonthlyCalendar.jsx';
+import CostReport from '../components/CostReport.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'month', label: 'Calendario mensual' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
   { id: 'map', label: 'Mapa en vivo' },
+  { id: 'costos', label: 'Costos' },
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
 ];
 
@@ -48,6 +50,7 @@ export default function AdminDashboard() {
       {tab === 'month' && <MonthlyCalendar />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
+      {tab === 'costos' && <CostReport />}
       {tab === 'catalog' && (
         catalogUnlocked
           ? <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />
@@ -83,12 +86,31 @@ function CalendarTab({ drivers, accounts }) {
     setModalState({ initial: route || { date: dateISO, hour, driver_id: driverId } });
   }
 
+  const [copiando, setCopiando] = useState(false);
+  async function copiarSemana() {
+    if (!routes.length) { alert('No hay rutas en esta semana para copiar.'); return; }
+    if (!confirm(`Copiar las ${routes.length} rutas de esta semana a la semana siguiente?`)) return;
+    setCopiando(true);
+    try {
+      for (const r of routes) {
+        const nd = toISODate(addDays(new Date(r.date + 'T00:00:00'), 7));
+        await api.createRoute({
+          date: nd, hour: r.hour, hora_fin: r.hora_fin || '', driver_id: Number(r.driver_id), account_id: Number(r.account_id),
+          proyecto: r.project_name || '', destino: r.destino, motivo: r.motivo || '', lat: r.lat, lng: r.lng,
+          tipo_movimiento: r.tipo_movimiento || '', elementos_trasladados: r.elementos_trasladados || '', costo_transporte: r.costo_transporte || '',
+        });
+      }
+      setWeekStart(addDays(weekStart, 7));
+    } catch (e) { alert('Error al copiar: ' + e.message); } finally { setCopiando(false); }
+  }
+
   return (
     <div>
       <div className="card-header">
         <h2 style={{ fontSize: 17 }}>🗺️ Asignacion de rutas diarias</h2>
         <div className="toolbar">
           <button className="btn btn-secondary" onClick={() => setShowBulk(true)}>Carga masiva (CSV)</button>
+          <button className="btn btn-secondary" disabled={copiando} onClick={copiarSemana}>{copiando ? 'Copiando...' : 'Copiar a semana siguiente'}</button>
           <button className="btn btn-primary" onClick={() => setModalState({ initial: { date: toISODate(new Date()), driver_id: driverId } })}>+ Nueva ruta</button>
         </div>
       </div>

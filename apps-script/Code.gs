@@ -561,7 +561,11 @@ function choferSalida(user, id, b) {
   return enrichOne(updateById('routes', id, { hora_salida: b.hora || hhmm(), status: 'en_curso', updated_at: nowISO() }));
 }
 function choferLlegada(user, id, b) {
-  ensureOwnRoute(user, id);
+  var route = ensureOwnRoute(user, id);
+  // Evidencia obligatoria: debe haber foto de elementos o guia de remision.
+  if ((!route.foto_elementos_url || route.foto_elementos_url === '') && (!route.guia_url || route.guia_url === '')) {
+    throw apiError(400, 'Adjunta la foto de elementos o la guia de remision antes de marcar como completado.');
+  }
   return enrichOne(updateById('routes', id, { hora_llegada: b.hora || hhmm(), status: 'completado', updated_at: nowISO() }));
 }
 function choferComentario(user, id, b) {

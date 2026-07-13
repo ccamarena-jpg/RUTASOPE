@@ -102,6 +102,7 @@ function RouteCard({ route, onUpdated }) {
   }
 
   const done = route.status === 'completado' || route.status === 'no_realizada';
+  const tieneEvidencia = (route.guia_url && route.guia_url !== '') || (route.foto_elementos_url && route.foto_elementos_url !== '');
   const navUrl = (route.lat != null && route.lat !== '' && route.lng != null && route.lng !== '')
     ? `https://www.google.com/maps/dir/?api=1&destination=${route.lat},${route.lng}`
     : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(route.destino || '')}`;
@@ -151,12 +152,15 @@ function RouteCard({ route, onUpdated }) {
                   <button className="btn btn-success" disabled={busy} onClick={marcarSalida}>Marcar hora de salida</button>
                 )}
                 {route.status === 'en_curso' && (
-                  <button className="btn btn-success" disabled={busy} onClick={marcarLlegada}>Marcar hora de llegada</button>
+                  <button className="btn btn-success" disabled={busy || !tieneEvidencia} title={!tieneEvidencia ? 'Adjunta la foto o la guia primero' : ''} onClick={marcarLlegada}>Marcar hora de llegada</button>
                 )}
                 {!showNoReal && (
                   <button className="btn btn-secondary" disabled={busy} onClick={() => setShowNoReal(true)}>Marcar no realizada</button>
                 )}
               </div>
+              {route.status === 'en_curso' && !tieneEvidencia && (
+                <div className="meta" style={{ color: 'var(--yellow)' }}>📎 Para completar la ruta debes adjuntar la foto de elementos o la guia de remision.</div>
+              )}
 
               {showNoReal && (
                 <div className="no-real-box">
