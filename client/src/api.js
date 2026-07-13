@@ -81,6 +81,7 @@ export const api = {
   getDrivers: () => call('/drivers'),
   createDriver: (payload) => call('/drivers', { method: 'POST', body: payload }),
   updateDriver: (id, payload) => call(`/drivers/${id}`, { method: 'PUT', body: payload }),
+  deleteDriver: (id) => call(`/drivers/${id}`, { method: 'DELETE' }),
 
   getUsers: () => call('/users'),
   updateUser: (id, payload) => call(`/users/${id}`, { method: 'PUT', body: payload }),

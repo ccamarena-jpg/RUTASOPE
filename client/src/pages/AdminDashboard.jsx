@@ -314,6 +314,20 @@ function DriversPanel({ drivers, onChange }) {
     } catch (err) { setError(err.message); }
   }
 
+  async function removeDriver(d) {
+    const linked = userByDriverId[Number(d.id)];
+    const msg = linked
+      ? `El chofer "${d.name}" tiene el login ${linked.email} vinculado. Si lo eliminas, ese acceso quedara sin chofer. ¿Eliminar de todos modos?`
+      : `¿Eliminar al chofer "${d.name}"?`;
+    if (!confirm(msg)) return;
+    setError('');
+    try {
+      await api.deleteDriver(d.id);
+      loadUsers();
+      onChange();
+    } catch (err) { setError(err.message); }
+  }
+
   return (
     <div className="card">
       <div className="card-header"><h3>🚚 Choferes y accesos</h3></div>
@@ -328,7 +342,10 @@ function DriversPanel({ drivers, onChange }) {
               <tr key={d.id}>
                 <td>{d.name}{Number(d.es_proveedor) === 1 && <span className="badge en_curso" style={{ marginLeft: 6 }}>Proveedor</span>}</td><td>{d.phone}</td><td>{d.vehicle}</td><td>{d.supervisor}</td>
                 <td>{u ? u.email : <span style={{ color: '#8894a6' }}>— sin login —</span>}</td>
-                <td><button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => setEditing(d)}>Editar</button></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-secondary" style={{ padding: '4px 10px' }} onClick={() => setEditing(d)}>Editar</button>
+                  <button className="btn btn-danger" style={{ padding: '4px 10px', marginLeft: 6 }} onClick={() => removeDriver(d)}>Eliminar</button>
+                </td>
               </tr>
             );
           })}

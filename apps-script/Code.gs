@@ -100,6 +100,7 @@ function handle(env) {
     }
     if (seg.length === 1 && method === 'POST') { requireRole(user, ['admin']); return createDriver(body); }
     if (seg.length === 2 && method === 'PUT') { requireRole(user, ['admin']); return updateDriver(seg[1], body); }
+    if (seg.length === 2 && method === 'DELETE') { requireRole(user, ['admin']); deleteById('drivers', seg[1]); return { ok: true }; }
   }
 
   if (seg[0] === 'accounts') {
@@ -730,7 +731,7 @@ function userDirectory() {
     { email: 'mcarhuallanqui@ttaudit.com', name: 'M. Carhuallanqui', role: 'cuenta' },
     { email: 'ghidalgo@ttaudit.com', name: 'G. Hidalgo', role: 'cuenta' },
     // Choferes / externos (correo o usuario + contrasena)
-    { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Cris', phone: '', vehicle: '', supervisor: 'Pamela' } },
+    { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Chris Herrera', vehicle: 'CDC 549', supervisor: 'Pamela' } },
     { email: 'ayronn@ttaudit.com', name: 'Ayronn', role: 'chofer', password: 'Ayronn', driver: { name: 'Ayronn', supervisor: 'Pamela' } },
     { email: 'proveedor1', name: 'Proveedor 1', role: 'chofer', password: 'Proveedor1', driver: { name: 'Proveedor 1', supervisor: 'Pamela', es_proveedor: 1 } },
   ];
