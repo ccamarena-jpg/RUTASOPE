@@ -12,6 +12,16 @@ export default function WeeklyCalendar({ drivers, driverId, onDriverChange, week
     routesBySlot[key].push(r);
   }
 
+  // Horas ocupadas (bloqueadas) entre la hora inicio y la hora fin de cada ruta.
+  const blockedBySlot = {};
+  for (const r of routes) {
+    if (!r.hora_fin) continue;
+    const s = HOURS.indexOf(r.hour);
+    const e = HOURS.indexOf(r.hora_fin);
+    if (s === -1 || e === -1) continue;
+    for (let i = s + 1; i < e; i++) blockedBySlot[`${r.date}_${HOURS[i]}`] = r;
+  }
+
   return (
     <div>
       <div className="toolbar" style={{ marginBottom: 10, justifyContent: 'space-between' }}>
@@ -62,18 +72,22 @@ export default function WeeklyCalendar({ drivers, driverId, onDriverChange, week
                   const dateISO = toISODate(d);
                   const slotRoutes = routesBySlot[`${dateISO}_${hour}`] || [];
                   const route = slotRoutes[0];
+                  const blocked = !route ? blockedBySlot[`${dateISO}_${hour}`] : null;
+                  const cls = route ? `filled ${route.status}` : blocked ? `filled ${blocked.status} slot-cont` : '';
                   return (
                     <td key={dateISO}>
                       <button
-                        className={`slot ${route ? `filled ${route.status}` : ''}`}
-                        onClick={() => onSlotClick(dateISO, hour, route || null)}
-                        title={route ? `${route.destino} - ${route.motivo || ''}` : 'Agregar ruta'}
+                        className={`slot ${cls}`}
+                        onClick={() => onSlotClick(dateISO, hour, route || blocked || null)}
+                        title={route ? `${route.destino} - ${route.motivo || ''}` : blocked ? `Ocupado: ${blocked.destino}` : 'Agregar ruta'}
                       >
                         {route ? (
                           <>
                             <span className="destino">{route.destino}</span>
-                            <span className="motivo">{route.account_name}{route.motivo ? ` - ${route.motivo}` : ''}</span>
+                            <span className="motivo">{route.account_name}{route.hora_fin ? ` · hasta ${route.hora_fin}` : ''}{route.motivo ? ` - ${route.motivo}` : ''}</span>
                           </>
+                        ) : blocked ? (
+                          <span className="motivo">⋯ {blocked.destino} (ocupado)</span>
                         ) : (
                           <span className="empty-hint">+ agregar</span>
                         )}

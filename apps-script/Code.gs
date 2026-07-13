@@ -45,7 +45,7 @@ var SCHEMA = {
     'guia_url', 'created_by', 'updated_at',
     'cantidad_bultos', 'gr_firmada', 'foto_elementos_url',
     'tipo_movimiento', 'elementos_trasladados', 'lat', 'lng', 'proyecto',
-    'costo_transporte', 'costo_proveedor',
+    'costo_transporte', 'costo_proveedor', 'hora_fin',
   ],
 };
 var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1 };
@@ -473,6 +473,7 @@ function createRoute(user, b) {
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
     lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
     costo_transporte: b.costo_transporte || '', costo_proveedor: b.costo_proveedor || '',
+    hora_fin: b.hora_fin || '',
   });
   return enrichOne(rec);
 }
@@ -489,6 +490,7 @@ function updateRoute(id, b) {
     proyecto: def(b.proyecto, ex.proyecto),
     costo_transporte: def(b.costo_transporte, ex.costo_transporte),
     costo_proveedor: def(b.costo_proveedor, ex.costo_proveedor),
+    hora_fin: def(b.hora_fin, ex.hora_fin),
     lat: def(b.lat, ex.lat), lng: def(b.lng, ex.lng), updated_at: nowISO(),
   };
   return enrichOne(updateById('routes', id, patch));
@@ -603,6 +605,7 @@ function createViaje(user, b) {
     tipo_movimiento: b.tipo_movimiento || '', elementos_trasladados: b.elementos_trasladados || '',
     lat: b.lat || '', lng: b.lng || '', proyecto: b.proyecto || '',
     costo_transporte: b.costo_transporte || '', costo_proveedor: b.costo_proveedor || '',
+    hora_fin: b.hora_fin || '',
   });
   return enrichOne(rec);
 }
@@ -738,6 +741,19 @@ function userDirectory() {
 // cuentas existentes. Los proyectos se crean aparte (varian por cuenta).
 function accountDirectory() {
   return ['BAT', 'Alicorp', 'Ilko', 'Casa Europa', 'Edgwell', 'Arca Continental', 'Palmera'];
+}
+
+// Limpia los datos de prueba: borra TODAS las rutas y proyectos (eran de
+// ejemplo/pruebas) y la cuenta demo "Backus". Conserva usuarios, choferes y las
+// cuentas reales. Ejecutala una vez desde el editor cuando quieras empezar limpio.
+function limpiarDemo() {
+  var borradas = { rutas: 0, proyectos: 0, cuentas: 0 };
+  readAll('routes').forEach(function (r) { if (deleteById('routes', r.id)) borradas.rutas++; });
+  readAll('projects').forEach(function (p) { if (deleteById('projects', p.id)) borradas.proyectos++; });
+  readAll('accounts').forEach(function (a) {
+    if (String(a.name).trim().toLowerCase() === 'backus') { if (deleteById('accounts', a.id)) borradas.cuentas++; }
+  });
+  return 'Limpieza lista. Rutas borradas: ' + borradas.rutas + ', proyectos: ' + borradas.proyectos + ', cuenta Backus: ' + borradas.cuentas + '.';
 }
 
 function setupAccounts() {

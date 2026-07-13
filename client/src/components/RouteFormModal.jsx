@@ -8,6 +8,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
   const isEdit = Boolean(initial?.id);
   const [date, setDate] = useState(initial?.date || '');
   const [hour, setHour] = useState(initial?.hour || HOURS[0]);
+  const [horaFin, setHoraFin] = useState(initial?.hora_fin || '');
   const [driverId, setDriverId] = useState(initial?.driver_id || drivers[0]?.id || '');
   const [accountId, setAccountId] = useState(initial?.account_id || accounts[0]?.id || '');
   const [proyecto, setProyecto] = useState(initial?.project_name || '');
@@ -44,7 +45,7 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
     }
     setSaving(true);
     try {
-      const payload = { date, hour, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos, costo_transporte: isProveedor ? costoTransporte : '' };
+      const payload = { date, hour, hora_fin: horaFin, driver_id: Number(driverId), account_id: Number(accountId), proyecto, destino, motivo, lat, lng, tipo_movimiento: tipoMovimiento, elementos_trasladados: elementos, costo_transporte: isProveedor ? costoTransporte : '' };
       if (isEdit) await api.updateRoute(initial.id, payload);
       else await api.createRoute(payload);
       onSaved();
@@ -77,11 +78,18 @@ export default function RouteFormModal({ initial, drivers, accounts, onClose, on
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
             <div className="field">
-              <label>Hora</label>
+              <label>Hora inicio</label>
               <select value={hour} onChange={(e) => setHour(e.target.value)}>
                 {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
+          </div>
+          <div className="field">
+            <label>Hora fin estimado (opcional) — bloquea el calendario hasta esa hora</label>
+            <select value={horaFin} onChange={(e) => setHoraFin(e.target.value)}>
+              <option value="">— sin definir —</option>
+              {HOURS.filter((h) => h > hour).map((h) => <option key={h} value={h}>{h}</option>)}
+            </select>
           </div>
           <div className="field">
             <label>Chofer</label>

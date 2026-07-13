@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import { toISODate } from '../utils/date';
+import { toISODate, addDays } from '../utils/date';
 import LiveMap from '../components/LiveMap.jsx';
+import { downloadRoutesCsv } from '../utils/csv';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
@@ -115,6 +116,15 @@ function TrackingPanel() {
 
   const visible = statusFilter === 'todos' ? routes : routes.filter((r) => r.status === statusFilter);
 
+  async function descargarTodo() {
+    const from = toISODate(addDays(new Date(), -365));
+    const to = toISODate(addDays(new Date(), 365));
+    try {
+      const all = await api.getRoutes({ from, to });
+      downloadRoutesCsv(all, `rutas_${toISODate(new Date())}.csv`);
+    } catch (e) { /* noop */ }
+  }
+
   return (
     <div className="card">
       <div className="card-header">
@@ -129,6 +139,7 @@ function TrackingPanel() {
             <option value="no_realizada">No realizada</option>
           </select>
           <button className="btn btn-secondary" onClick={load}>Actualizar</button>
+          <button className="btn btn-primary" onClick={descargarTodo}>⬇ Descargar CSV</button>
         </div>
       </div>
       {lastUpdated && <div style={{ fontSize: 12, color: '#889', marginBottom: 10 }}>Ultima actualizacion: {lastUpdated.toLocaleTimeString()} (auto cada 15s)</div>}

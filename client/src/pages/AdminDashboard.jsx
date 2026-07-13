@@ -4,8 +4,6 @@ import WeeklyCalendar from '../components/WeeklyCalendar.jsx';
 import RouteFormModal from '../components/RouteFormModal.jsx';
 import BulkUploadModal from '../components/BulkUploadModal.jsx';
 import LiveMap from '../components/LiveMap.jsx';
-import MovimientoPicker from '../components/MovimientoPicker.jsx';
-import AddressPicker from '../components/AddressPicker.jsx';
 import DashboardTab from '../components/DashboardTab.jsx';
 import MonthlyCalendar from '../components/MonthlyCalendar.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
@@ -65,7 +63,6 @@ function CalendarTab({ drivers, accounts }) {
   const [routes, setRoutes] = useState([]);
   const [modalState, setModalState] = useState(null); // { initial }
   const [showBulk, setShowBulk] = useState(false);
-  const [showViaje, setShowViaje] = useState(false);
 
   useEffect(() => {
     if (!driverId && drivers.length) setDriverId(drivers[0].id);
@@ -92,7 +89,6 @@ function CalendarTab({ drivers, accounts }) {
         <h2 style={{ fontSize: 17 }}>🗺️ Asignacion de rutas diarias</h2>
         <div className="toolbar">
           <button className="btn btn-secondary" onClick={() => setShowBulk(true)}>Carga masiva (CSV)</button>
-          <button className="btn btn-secondary" onClick={() => setShowViaje(true)}>+ Registrar viaje</button>
           <button className="btn btn-primary" onClick={() => setModalState({ initial: { date: toISODate(new Date()), driver_id: driverId } })}>+ Nueva ruta</button>
         </div>
       </div>
@@ -117,89 +113,6 @@ function CalendarTab({ drivers, accounts }) {
         />
       )}
       {showBulk && <BulkUploadModal onClose={() => setShowBulk(false)} onDone={load} />}
-      {showViaje && (
-        <ViajeModal
-          drivers={drivers}
-          defaultDriverId={driverId}
-          onClose={() => setShowViaje(false)}
-          onSaved={() => { setShowViaje(false); load(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function ViajeModal({ drivers, defaultDriverId, onClose, onSaved }) {
-  const [driverId, setDriverId] = useState(defaultDriverId || drivers[0]?.id || '');
-  const [tipoMovimiento, setTipoMovimiento] = useState('');
-  const [destino, setDestino] = useState('');
-  const [elementos, setElementos] = useState('');
-  const [cantidadBultos, setCantidadBultos] = useState('');
-  const [lat, setLat] = useState(null);
-  const [lng, setLng] = useState(null);
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  function handlePick({ lat: la, lng: ln, address }) {
-    setLat(la); setLng(ln);
-    if (!destino) setDestino(address);
-  }
-
-  async function submit(e) {
-    e.preventDefault();
-    if (!driverId) { setError('Selecciona el chofer'); return; }
-    if (!destino.trim()) { setError('Indica el destino del viaje'); return; }
-    setSaving(true); setError('');
-    try {
-      await api.registrarViaje({
-        driver_id: Number(driverId), destino: destino.trim(), tipo_movimiento: tipoMovimiento,
-        elementos_trasladados: elementos, cantidad_bultos: cantidadBultos, lat, lng,
-      });
-      onSaved();
-    } catch (err) { setError(err.message); } finally { setSaving(false); }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Registrar viaje</h3>
-        {error && <div className="error-msg">{error}</div>}
-        <form onSubmit={submit}>
-          <div className="field">
-            <label>Chofer</label>
-            <select value={driverId} onChange={(e) => setDriverId(e.target.value)}>
-              {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}{d.vehicle ? ` (${d.vehicle})` : ''}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label>Tipo de movimiento</label>
-            <MovimientoPicker value={tipoMovimiento} onChange={setTipoMovimiento} />
-          </div>
-          <div className="field">
-            <label>Ubicacion (buscar en el mapa)</label>
-            <AddressPicker onPick={handlePick} />
-            <div style={{ fontSize: 12, color: lat != null ? 'var(--green)' : 'var(--text-soft)', marginTop: 4 }}>
-              {lat != null ? `📍 Ubicacion cargada (${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)})` : 'Opcional: elige una sugerencia para ubicar el viaje en el mapa.'}
-            </div>
-          </div>
-          <div className="field">
-            <label>Destino</label>
-            <input value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="Ej: Almacen Chiclin" required />
-          </div>
-          <div className="field">
-            <label>Elementos trasladados (detalle de la mercancia)</label>
-            <textarea value={elementos} onChange={(e) => setElementos(e.target.value)} placeholder="Detalle de la mercancia..." />
-          </div>
-          <div className="field">
-            <label>Cantidad de bultos (paquetes/cajas)</label>
-            <input type="number" min="0" inputMode="numeric" value={cantidadBultos} onChange={(e) => setCantidadBultos(e.target.value)} placeholder="Ej: 5" />
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? 'Guardando...' : 'Registrar viaje'}</button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

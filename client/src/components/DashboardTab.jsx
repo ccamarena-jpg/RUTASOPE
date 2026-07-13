@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { getMonday, addDays, toISODate, formatShort } from '../utils/date';
+import { downloadRoutesCsv } from '../utils/csv';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
@@ -112,6 +113,7 @@ export default function DashboardTab() {
             <label style={{ fontSize: 13, color: '#556' }}>al</label>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
             <button className="btn btn-secondary" onClick={() => { setFrom(toISODate(getMonday(new Date()))); setTo(toISODate(addDays(getMonday(new Date()), 6))); }}>Esta semana</button>
+            <button className="btn btn-primary" disabled={routes.length === 0} onClick={() => downloadRoutesCsv(routes, `rutas_${from}_a_${to}.csv`)}>⬇ Descargar CSV</button>
           </div>
         </div>
 

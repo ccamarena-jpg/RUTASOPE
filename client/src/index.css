@@ -393,6 +393,7 @@ table.calendar tr:nth-child(even) td:not(.hour-col) { background: var(--gray-row
 .slot.filled.en_curso { background: var(--yellow-bg); border-left: 4px solid var(--yellow); }
 .slot.filled.completado { background: var(--green-bg); border-left: 4px solid var(--green); }
 .slot.filled.no_realizada { background: #fdece9; border-left: 4px solid var(--red); }
+.slot.slot-cont { opacity: 0.7; font-style: italic; }
 .slot .destino { font-weight: 700; display: block; }
 .slot .motivo { color: #556; display: block; }
 .slot .empty-hint { color: #b7c0cb; }
