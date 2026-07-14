@@ -208,7 +208,7 @@ function RouteCard({ route, onUpdated }) {
                 <div className="actions" style={{ marginTop: 10 }}>
                   <label className="btn btn-secondary" style={{ margin: 0 }}>
                     Foto de elementos entregados/recogidos
-                    <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={subirFotoElementos} disabled={busy} />
+                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={subirFotoElementos} disabled={busy} />
                   </label>
                 </div>
                 {route.foto_elementos_url && (

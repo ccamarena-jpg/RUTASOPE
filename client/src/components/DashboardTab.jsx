@@ -57,10 +57,18 @@ export default function DashboardTab() {
     const byDay = {};
     const byWeek = {};
     const durations = [];
+    const movByChofer = {};
+    const costoPorProveedor = {};
     let costoT = 0;
 
     routes.forEach((r) => {
       costoT += Number(r.costo_transporte) || 0;
+      const chof = r.driver_name || 'Sin chofer';
+      if (!movByChofer[chof]) movByChofer[chof] = { nombre: chof, rutas: 0, completadas: 0 };
+      movByChofer[chof].rutas++;
+      if (r.status === 'completado') movByChofer[chof].completadas++;
+      const c = Number(r.costo_transporte) || 0;
+      if (c > 0) costoPorProveedor[chof] = { nombre: chof, costo: (costoPorProveedor[chof]?.costo || 0) + c, rutas: (costoPorProveedor[chof]?.rutas || 0) + 1 };
       byStatus[r.status] = (byStatus[r.status] || 0) + 1;
       const acc = r.account_name || 'Sin cuenta';
       byAccount[acc] = (byAccount[acc] || 0) + 1;
@@ -90,7 +98,11 @@ export default function DashboardTab() {
       dur: avg(v.dur),
     }));
 
-    return { byStatus, total: routes.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT };
+    return {
+      byStatus, total: routes.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT,
+      costoProveedores: Object.values(costoPorProveedor).sort((a, b) => b.costo - a.costo),
+      movChofer: Object.values(movByChofer).sort((a, b) => b.rutas - a.rutas),
+    };
   }, [routes, from, to]);
 
   const tiles = [
@@ -166,6 +178,40 @@ export default function DashboardTab() {
             </tbody>
           </table>
         )}
+      </div>
+
+      <div className="dash-grid">
+        <div className="card">
+          <div className="section-title"><span className="st-icon">🚚</span> Costo de transporte por proveedor</div>
+          {m.costoProveedores.length === 0 ? (
+            <div className="empty-state" style={{ padding: '16px 0' }}>Sin costos de proveedor en el periodo.</div>
+          ) : (
+            <table className="simple">
+              <thead><tr><th>Proveedor</th><th>Rutas</th><th>Costo</th></tr></thead>
+              <tbody>
+                {m.costoProveedores.map((p) => (
+                  <tr key={p.nombre}><td>{p.nombre}</td><td>{p.rutas}</td><td><strong>S/ {p.costo.toFixed(2)}</strong></td></tr>
+                ))}
+                <tr><td><strong>Total</strong></td><td /><td><strong>S/ {m.costoT.toFixed(2)}</strong></td></tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="card">
+          <div className="section-title"><span className="st-icon">📦</span> Movimientos por chofer</div>
+          {m.movChofer.length === 0 ? (
+            <div className="empty-state" style={{ padding: '16px 0' }}>Sin movimientos en el periodo.</div>
+          ) : (
+            <table className="simple">
+              <thead><tr><th>Chofer</th><th>Rutas</th><th>Completadas</th></tr></thead>
+              <tbody>
+                {m.movChofer.map((c) => (
+                  <tr key={c.nombre}><td>{c.nombre}</td><td>{c.rutas}</td><td>{c.completadas}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

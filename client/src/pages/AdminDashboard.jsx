@@ -6,7 +6,6 @@ import BulkUploadModal from '../components/BulkUploadModal.jsx';
 import LiveMap from '../components/LiveMap.jsx';
 import DashboardTab from '../components/DashboardTab.jsx';
 import MonthlyCalendar from '../components/MonthlyCalendar.jsx';
-import CostReport from '../components/CostReport.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
@@ -17,7 +16,6 @@ const TABS = [
   { id: 'month', label: 'Calendario mensual' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
   { id: 'map', label: 'Mapa en vivo' },
-  { id: 'costos', label: 'Costos' },
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
 ];
 
@@ -50,7 +48,6 @@ export default function AdminDashboard() {
       {tab === 'month' && <MonthlyCalendar />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
-      {tab === 'costos' && <CostReport />}
       {tab === 'catalog' && (
         catalogUnlocked
           ? <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />
