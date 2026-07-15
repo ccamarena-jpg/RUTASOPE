@@ -1,33 +1,103 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import { toISODate, addDays } from '../utils/date';
+import { toISODate, addDays, getMonday } from '../utils/date';
 import LiveMap from '../components/LiveMap.jsx';
+import DashboardTab from '../components/DashboardTab.jsx';
+import WeeklyCalendar from '../components/WeeklyCalendar.jsx';
 import { downloadRoutesCsv } from '../utils/csv';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
 const TABS = [
-  { id: 'projects', label: 'Proyectos' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'calendar', label: 'Calendario semanal' },
   { id: 'tracking', label: 'Seguimiento en tiempo real' },
+  { id: 'projects', label: 'Proyectos' },
   { id: 'map', label: 'Mapa en vivo' },
 ];
 
 export default function AccountView() {
-  const [tab, setTab] = useState('projects');
+  const [tab, setTab] = useState('dashboard');
   return (
     <div>
       <div className="page-head">
         <h1>Panel de responsable de cuenta</h1>
-        <p>Crea los proyectos de cada cuenta y sigue el estado de las rutas en tiempo real.</p>
+        <p>Consulta el dashboard y el calendario (solo lectura), crea proyectos y sigue las rutas en tiempo real.</p>
       </div>
       <div className="tabs">
         {TABS.map((t) => (
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
-      {tab === 'projects' && <ProjectsPanel />}
+      {tab === 'dashboard' && <DashboardTab />}
+      {tab === 'calendar' && <CalendarView />}
       {tab === 'tracking' && <TrackingPanel />}
+      {tab === 'projects' && <ProjectsPanel />}
       {tab === 'map' && <LiveMap />}
+    </div>
+  );
+}
+
+// Calendario semanal en modo lectura para responsables de cuenta.
+function CalendarView() {
+  const [drivers, setDrivers] = useState([]);
+  const [driverId, setDriverId] = useState(null);
+  const [weekStart, setWeekStart] = useState(getMonday(new Date()));
+  const [routes, setRoutes] = useState([]);
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => { api.getDrivers().then(setDrivers).catch(() => {}); }, []);
+  useEffect(() => { if (!driverId && drivers.length) setDriverId(drivers[0].id); }, [drivers, driverId]);
+
+  const load = useCallback(() => {
+    if (!driverId) return;
+    const from = toISODate(weekStart);
+    const to = toISODate(addDays(weekStart, 6));
+    api.getRoutes({ from, to, driver_id: driverId }).then(setRoutes).catch(() => {});
+  }, [driverId, weekStart]);
+  useEffect(() => { load(); }, [load]);
+
+  const driverMeta = drivers.find((d) => d.id === driverId);
+
+  return (
+    <div>
+      <WeeklyCalendar
+        drivers={drivers}
+        driverId={driverId}
+        onDriverChange={setDriverId}
+        weekStart={weekStart}
+        onWeekChange={setWeekStart}
+        routes={routes}
+        onSlotClick={(dateISO, hour, route) => { if (route) setInfo(route); }}
+        driverMeta={driverMeta}
+      />
+      {info && <RouteInfoModal route={info} onClose={() => setInfo(null)} />}
+    </div>
+  );
+}
+
+function RouteInfoModal({ route, onClose }) {
+  const row = (label, value) => value ? <div className="meta"><b>{label}:</b> {value}</div> : null;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>{route.destino}</h3>
+        {row('Fecha', route.date)}
+        {row('Hora', `${route.hour}${route.hora_fin ? ` – ${route.hora_fin}` : ''}`)}
+        {row('Chofer', route.driver_name)}
+        {row('Cuenta', route.account_name)}
+        {row('Proyecto', route.project_name)}
+        {row('Estado', STATUS_LABEL[route.status] || route.status)}
+        {row('Salida', route.hora_salida)}
+        {row('Llegada', route.hora_llegada)}
+        {row('Motivo', route.motivo)}
+        {row('Comentario', route.comentario_chofer)}
+        {row('Costo de transporte', (route.costo_transporte != null && route.costo_transporte !== '') ? `S/ ${Number(route.costo_transporte).toFixed(2)}` : '')}
+        {route.guia_url && <div className="file-info">Guia: <a href={route.guia_url} target="_blank" rel="noreferrer">ver</a></div>}
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }

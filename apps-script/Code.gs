@@ -730,10 +730,11 @@ function userDirectory() {
     { email: 'rgallo@ttaudit.com', name: 'R. Gallo', role: 'admin' },
     { email: 'operaciones@ttaudit.com', name: 'Operaciones TT Audit', role: 'admin' },
     // Responsables de cuenta (crean proyectos para todas las cuentas)
-    { email: 'rpulido@ttaudit.com', name: 'R. Pulido', role: 'cuenta' },
+    { email: 'rpulido@ttaudit.com', name: 'R. Pulido', role: 'cuenta', password: 'Rpulido2026' },
     { email: 'dolaguibel@ttaudit.com', name: 'D. Olaguibel', role: 'cuenta' },
     { email: 'mcarhuallanqui@ttaudit.com', name: 'M. Carhuallanqui', role: 'cuenta' },
     { email: 'ghidalgo@ttaudit.com', name: 'G. Hidalgo', role: 'cuenta' },
+    { email: 'earostegui@ttaudit.com', name: 'E. Arostegui', role: 'cuenta' },
     // Choferes / externos (correo o usuario + contrasena)
     { email: 'cris@ttaudit.com', name: 'Cris', role: 'chofer', password: 'Cris', driver: { name: 'Chris Herrera', vehicle: 'CDC 549', supervisor: 'Pamela' } },
     { email: 'ayronn@ttaudit.com', name: 'Ayronn', role: 'chofer', password: 'Ayronn', driver: { name: 'Ayronn', supervisor: 'Pamela' } },

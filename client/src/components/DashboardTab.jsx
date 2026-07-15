@@ -42,6 +42,8 @@ export default function DashboardTab() {
   const [from, setFrom] = useState(toISODate(getMonday(new Date())));
   const [to, setTo] = useState(toISODate(addDays(getMonday(new Date()), 6)));
   const [routes, setRoutes] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [driverFilter, setDriverFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(() => {
@@ -50,6 +52,9 @@ export default function DashboardTab() {
   }, [from, to]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.getDrivers().then(setDrivers).catch(() => {}); }, []);
+
+  const shown = useMemo(() => (driverFilter ? routes.filter((r) => Number(r.driver_id) === Number(driverFilter)) : routes), [routes, driverFilter]);
 
   const m = useMemo(() => {
     const byStatus = { pendiente: 0, en_curso: 0, completado: 0, no_realizada: 0 };
@@ -61,7 +66,7 @@ export default function DashboardTab() {
     const costoPorProveedor = {};
     let costoT = 0;
 
-    routes.forEach((r) => {
+    shown.forEach((r) => {
       costoT += Number(r.costo_transporte) || 0;
       const chof = r.driver_name || 'Sin chofer';
       if (!movByChofer[chof]) movByChofer[chof] = { nombre: chof, rutas: 0, completadas: 0 };
@@ -99,11 +104,11 @@ export default function DashboardTab() {
     }));
 
     return {
-      byStatus, total: routes.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT,
+      byStatus, total: shown.length, accountBars, days, weeks, avgDur: avg(durations), durCount: durations.length, costoT,
       costoProveedores: Object.values(costoPorProveedor).sort((a, b) => b.costo - a.costo),
       movChofer: Object.values(movByChofer).sort((a, b) => b.rutas - a.rutas),
     };
-  }, [routes, from, to]);
+  }, [shown, from, to]);
 
   const tiles = [
     { key: 'total', label: 'Rutas totales', value: m.total, cls: '' },
@@ -124,8 +129,12 @@ export default function DashboardTab() {
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             <label style={{ fontSize: 13, color: '#556' }}>al</label>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)}>
+              <option value="">Todos los choferes</option>
+              {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
             <button className="btn btn-secondary" onClick={() => { setFrom(toISODate(getMonday(new Date()))); setTo(toISODate(addDays(getMonday(new Date()), 6))); }}>Esta semana</button>
-            <button className="btn btn-primary" disabled={routes.length === 0} onClick={() => downloadRoutesCsv(routes, `rutas_${from}_a_${to}.csv`)}>⬇ Descargar CSV</button>
+            <button className="btn btn-primary" disabled={shown.length === 0} onClick={() => downloadRoutesCsv(shown, `rutas_${from}_a_${to}.csv`)}>⬇ Descargar CSV</button>
           </div>
         </div>
 
