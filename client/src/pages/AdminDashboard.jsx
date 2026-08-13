@@ -157,25 +157,60 @@ function TodayTab() {
     return () => clearInterval(id);
   }, [load]);
 
+  const [exportRange, setExportRange] = useState('dia');
+  const [exportFrom, setExportFrom] = useState(date);
+  const [exportTo, setExportTo] = useState(date);
+  const [exporting, setExporting] = useState(false);
+
   const driverNames = useMemo(() => [...new Set(routes.map((r) => r.driver_name))].sort(), [routes]);
   const accountNames = useMemo(() => [...new Set(routes.map((r) => r.account_name))].sort(), [routes]);
 
-  const visible = useMemo(() => {
+  const matchesFilters = useCallback((r) => {
     const q = search.trim().toLowerCase();
-    return routes.filter((r) => {
-      if (driverFilter !== 'todos' && r.driver_name !== driverFilter) return false;
-      if (accountFilter !== 'todos' && r.account_name !== accountFilter) return false;
-      if (statusFilter !== 'todos' && r.status !== statusFilter) return false;
-      if (q) {
-        const hay = `${r.destino} ${r.motivo || ''} ${r.driver_name} ${r.account_name} ${r.project_name || ''}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [routes, search, driverFilter, accountFilter, statusFilter]);
+    if (driverFilter !== 'todos' && r.driver_name !== driverFilter) return false;
+    if (accountFilter !== 'todos' && r.account_name !== accountFilter) return false;
+    if (statusFilter !== 'todos' && r.status !== statusFilter) return false;
+    if (q) {
+      const hay = `${r.destino} ${r.motivo || ''} ${r.driver_name} ${r.account_name} ${r.project_name || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }, [search, driverFilter, accountFilter, statusFilter]);
 
-  function exportCsv() {
-    downloadRoutesCsv(visible, `rutas_${date}.csv`);
+  const visible = useMemo(() => routes.filter(matchesFilters), [routes, matchesFilters]);
+
+  // Calcula el rango [from, to] a exportar segun el preset elegido (ancla = fecha seleccionada).
+  function exportDates() {
+    const anchor = new Date(date + 'T00:00:00');
+    if (exportRange === 'semana') {
+      const mon = getMonday(anchor);
+      return { from: toISODate(mon), to: toISODate(addDays(mon, 6)) };
+    }
+    if (exportRange === 'mes') {
+      const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+      const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+      return { from: toISODate(first), to: toISODate(last) };
+    }
+    if (exportRange === 'rango') return { from: exportFrom, to: exportTo };
+    return { from: date, to: date };
+  }
+
+  async function exportCsv() {
+    const { from, to } = exportDates();
+    if (from > to) return;
+    setExporting(true);
+    try {
+      // El dia seleccionado ya esta cargado en vivo; otros rangos se piden al backend.
+      const data = (from === date && to === date)
+        ? visible
+        : (await api.getRoutes({ from, to })).filter(matchesFilters);
+      const name = from === to ? `rutas_${from}.csv` : `rutas_${from}_a_${to}.csv`;
+      downloadRoutesCsv(data, name);
+    } catch {
+      // Si falla la carga del rango, no se descarga nada.
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -185,7 +220,6 @@ function TodayTab() {
         <div className="toolbar">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <button className="btn btn-secondary" onClick={load}>Actualizar</button>
-          <button className="btn btn-secondary" onClick={exportCsv} disabled={visible.length === 0}>⬇ Exportar CSV</button>
           {lastUpdated && <span style={{ fontSize: 12, color: '#889' }}>Actualizado {lastUpdated.toLocaleTimeString()}</span>}
         </div>
       </div>
@@ -215,6 +249,29 @@ function TodayTab() {
           <option value="completado">Completado</option>
           <option value="no_realizada">No realizada</option>
         </select>
+      </div>
+
+      <div className="toolbar filters-row">
+        <span style={{ fontSize: 13, color: 'var(--text-soft)', alignSelf: 'center' }}>⬇ Exportar CSV:</span>
+        <select value={exportRange} onChange={(e) => setExportRange(e.target.value)}>
+          <option value="dia">Dia seleccionado</option>
+          <option value="semana">Semana del dia</option>
+          <option value="mes">Mes del dia</option>
+          <option value="rango">Rango personalizado</option>
+        </select>
+        {exportRange === 'rango' && (
+          <>
+            <input type="date" value={exportFrom} max={exportTo} onChange={(e) => setExportFrom(e.target.value)} />
+            <span style={{ alignSelf: 'center', color: 'var(--text-soft)' }}>a</span>
+            <input type="date" value={exportTo} min={exportFrom} onChange={(e) => setExportTo(e.target.value)} />
+          </>
+        )}
+        <button className="btn btn-secondary" onClick={exportCsv} disabled={exporting}>
+          {exporting ? 'Generando...' : 'Descargar'}
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--text-soft)', alignSelf: 'center' }}>
+          Aplica los filtros de arriba (chofer, cuenta, estado, busqueda).
+        </span>
       </div>
 
       {visible.length === 0 ? (
