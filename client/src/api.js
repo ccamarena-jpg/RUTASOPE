@@ -67,8 +67,20 @@ async function call(path, { method = 'GET', body = null, query = null, file = nu
   try { payload = await res.json(); } catch (e) { /* respuesta no JSON */ }
 
   if (!payload || payload.ok === false) {
-    const err = new Error((payload && payload.error) || `Error ${(payload && payload.status) || res.status}`);
-    err.status = payload && payload.status;
+    const status = (payload && payload.status) || res.status;
+    // Sesion vencida o token invalido (p. ej. tras republicar el Apps Script o
+    // cambiar el JWT_SECRET). Antes esto fallaba en silencio y las listas
+    // (choferes, rutas...) quedaban vacias sin avisar. Ahora cerramos la sesion
+    // y volvemos al login para que el usuario reautentique. No aplica a /auth/*
+    // (un 401 ahi es simplemente credencial equivocada).
+    if (status === 401 && !path.startsWith('/auth/')) {
+      clearSession();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+    }
+    const err = new Error((payload && payload.error) || `Error ${status}`);
+    err.status = status;
     throw err;
   }
   return payload.data;
