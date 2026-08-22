@@ -7,6 +7,7 @@ import LiveMap from '../components/LiveMap.jsx';
 import DashboardTab from '../components/DashboardTab.jsx';
 import MonthlyCalendar from '../components/MonthlyCalendar.jsx';
 import StatusSummary from '../components/StatusSummary.jsx';
+import UnitsPanel from '../components/UnitsPanel.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
 
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'month', label: 'Calendario mensual' },
   { id: 'today', label: 'Rutas de hoy (en vivo)' },
   { id: 'map', label: 'Mapa en vivo' },
+  { id: 'units', label: 'Unidades moviles' },
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
 ];
 
@@ -48,6 +50,7 @@ export default function AdminDashboard() {
       {tab === 'month' && <MonthlyCalendar />}
       {tab === 'today' && <TodayTab />}
       {tab === 'map' && <LiveMap />}
+      {tab === 'units' && <UnitsPanel />}
       {tab === 'catalog' && (
         catalogUnlocked
           ? <CatalogTab drivers={drivers} accounts={accounts} onChange={refreshCatalog} />

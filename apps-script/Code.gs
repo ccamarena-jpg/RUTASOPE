@@ -47,8 +47,26 @@ var SCHEMA = {
     'tipo_movimiento', 'elementos_trasladados', 'lat', 'lng', 'proyecto',
     'costo_transporte', 'costo_proveedor', 'hora_fin',
   ],
+  // ====== FLOTA (unidades moviles) ======
+  // Ficha de cada unidad movil. Las fechas *_venc son de vencimiento (proxima)
+  // y alimentan el semaforo (vencido / por vencer / al dia) en el frontend.
+  units: [
+    'id', 'placa', 'marca', 'modelo', 'anio', 'driver_id', 'estado',
+    'rev_tt_venc', 'mant_euro_venc', 'soat_venc', 'rtv_venc', 'poliza_venc',
+    'tarjeta_propiedad', 'km_ultimo_mant', 'km_intervalo_mant', 'notas', 'updated_at',
+  ],
+  // Checklist de materiales obligatorios por unidad. tiene: 1/0. vencimiento:
+  // opcional (extintor y botiquin caducan) y entra al semaforo.
+  unit_materiales: ['id', 'unit_id', 'material', 'tiene', 'vencimiento', 'nota'],
+  // Papeletas de transito por unidad.
+  unit_papeletas: ['id', 'unit_id', 'fecha', 'papeleta_num', 'infraccion', 'monto', 'estado', 'driver_id', 'foto_url', 'created_by', 'created_at'],
+  // Historial de kilometraje (lecturas de odometro).
+  unit_km: ['id', 'unit_id', 'fecha', 'km', 'nota', 'created_by', 'created_at'],
 };
-var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1 };
+var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1, unit_id: 1, anio: 1, km: 1, km_ultimo_mant: 1, km_intervalo_mant: 1, monto: 1, tiene: 1 };
+
+// Materiales obligatorios que se crean por defecto al registrar una unidad.
+var DEFAULT_MATERIALES = ['Extintor', 'Botiquin', 'Cono de seguridad', 'Gata', 'Llanta de repuesto', 'Triangulos de seguridad', 'Chaleco reflectivo', 'Llave de ruedas'];
 
 // ====== ENTRADAS HTTP ======
 function doGet() {
@@ -155,6 +173,26 @@ function handle(env) {
       if (action === 'foto-elementos') return choferFotoElementos(user, seg[1], body);
       if (action === 'guia') return choferGuia(user, seg[1], body);
     }
+  }
+
+  // ====== FLOTA (unidades moviles) — solo admin ======
+  if (seg[0] === 'units') {
+    requireRole(user, ['admin']);
+    if (seg.length === 1 && method === 'GET') return listUnits();
+    if (seg.length === 1 && method === 'POST') return createUnit(user, body);
+    if (seg.length === 2 && method === 'GET') return getUnitDetail(seg[1]);
+    if (seg.length === 2 && method === 'PUT') return updateUnit(seg[1], body);
+    if (seg.length === 2 && method === 'DELETE') { deleteUnit(seg[1]); return { ok: true }; }
+    if (seg.length === 3 && method === 'POST') {
+      if (seg[2] === 'materiales') return saveMateriales(seg[1], body);
+      if (seg[2] === 'papeletas') return addPapeleta(user, seg[1], body);
+      if (seg[2] === 'km') return addKm(user, seg[1], body);
+    }
+    if (seg.length === 4 && seg[2] === 'papeletas') {
+      if (method === 'PUT') return updatePapeleta(seg[1], seg[3], body);
+      if (method === 'DELETE') { deletePapeleta(seg[1], seg[3]); return { ok: true }; }
+    }
+    if (seg.length === 4 && seg[2] === 'km' && method === 'DELETE') { deleteKm(seg[1], seg[3]); return { ok: true }; }
   }
 
   throw apiError(404, 'Ruta no encontrada: ' + method + ' ' + path);
@@ -631,6 +669,166 @@ function uploadGuia(dataB64, name, mime) {
   var file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return 'https://drive.google.com/file/d/' + file.getId() + '/view';
+}
+
+// ====== FLOTA (unidades moviles) ======
+// Ultimo kilometraje registrado para una unidad (max km del historial).
+function unitKmActual(unitId) {
+  var rows = readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(unitId); });
+  if (!rows.length) return '';
+  return rows.reduce(function (m, k) { return Math.max(m, Number(k.km) || 0); }, 0);
+}
+
+// Agrega driver_name y km_actual a una unidad.
+function enrichUnit(u, driversById) {
+  var o = Object.assign({}, u);
+  var d = u.driver_id ? driversById[Number(u.driver_id)] : null;
+  o.driver_name = d ? d.name : null;
+  o.km_actual = unitKmActual(u.id);
+  // Proximo mantenimiento por km (si hay intervalo configurado).
+  if (u.km_ultimo_mant !== '' && u.km_ultimo_mant != null && u.km_intervalo_mant) {
+    o.km_proximo_mant = Number(u.km_ultimo_mant) + Number(u.km_intervalo_mant);
+  } else {
+    o.km_proximo_mant = '';
+  }
+  return o;
+}
+
+function listUnits() {
+  var driversById = {};
+  readAll('drivers').forEach(function (d) { driversById[Number(d.id)] = d; });
+  var units = readAll('units').map(function (u) { return enrichUnit(u, driversById); });
+  units.sort(function (a, b) { return String(a.placa).localeCompare(String(b.placa)); });
+  return units;
+}
+
+function getUnitDetail(id) {
+  var unit = getById('units', id);
+  if (!unit) throw apiError(404, 'Unidad no encontrada');
+  var driversById = {};
+  readAll('drivers').forEach(function (d) { driversById[Number(d.id)] = d; });
+  var materiales = readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(id); });
+  var papeletas = readAll('unit_papeletas').filter(function (p) { return String(p.unit_id) === String(id); });
+  papeletas.forEach(function (p) { var d = p.driver_id ? driversById[Number(p.driver_id)] : null; p.driver_name = d ? d.name : null; });
+  papeletas.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+  var km = readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); });
+  km.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
+  return { unit: enrichUnit(unit, driversById), materiales: materiales, papeletas: papeletas, km: km };
+}
+
+function unitPatchFromBody(b, ex) {
+  ex = ex || {};
+  return {
+    placa: def(b.placa, ex.placa || ''),
+    marca: def(b.marca, ex.marca || ''),
+    modelo: def(b.modelo, ex.modelo || ''),
+    anio: def(b.anio, ex.anio || ''),
+    driver_id: def(b.driver_id, ex.driver_id || ''),
+    estado: def(b.estado, ex.estado || 'activa'),
+    rev_tt_venc: def(b.rev_tt_venc, ex.rev_tt_venc || ''),
+    mant_euro_venc: def(b.mant_euro_venc, ex.mant_euro_venc || ''),
+    soat_venc: def(b.soat_venc, ex.soat_venc || ''),
+    rtv_venc: def(b.rtv_venc, ex.rtv_venc || ''),
+    poliza_venc: def(b.poliza_venc, ex.poliza_venc || ''),
+    tarjeta_propiedad: def(b.tarjeta_propiedad, ex.tarjeta_propiedad || ''),
+    km_ultimo_mant: def(b.km_ultimo_mant, ex.km_ultimo_mant || ''),
+    km_intervalo_mant: def(b.km_intervalo_mant, ex.km_intervalo_mant || ''),
+    notas: def(b.notas, ex.notas || ''),
+    updated_at: nowISO(),
+  };
+}
+
+function createUnit(user, b) {
+  if (!b.placa) throw apiError(400, 'La placa es requerida');
+  var rec = append('units', unitPatchFromBody(b, {}));
+  // Sembrar el checklist de materiales obligatorios por defecto.
+  DEFAULT_MATERIALES.forEach(function (name) {
+    append('unit_materiales', { unit_id: rec.id, material: name, tiene: 1, vencimiento: '', nota: '' });
+  });
+  return getUnitDetail(rec.id);
+}
+
+function updateUnit(id, b) {
+  var ex = getById('units', id);
+  if (!ex) throw apiError(404, 'Unidad no encontrada');
+  updateById('units', id, unitPatchFromBody(b, ex));
+  return getUnitDetail(id);
+}
+
+function deleteUnit(id) {
+  // Cascada: borra materiales, papeletas y kilometraje de la unidad.
+  readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(id); }).forEach(function (m) { deleteById('unit_materiales', m.id); });
+  readAll('unit_papeletas').filter(function (p) { return String(p.unit_id) === String(id); }).forEach(function (p) { deleteById('unit_papeletas', p.id); });
+  readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); }).forEach(function (k) { deleteById('unit_km', k.id); });
+  deleteById('units', id);
+  return true;
+}
+
+// Reemplaza todo el checklist de materiales de una unidad con la lista enviada.
+function saveMateriales(unitId, b) {
+  if (!getById('units', unitId)) throw apiError(404, 'Unidad no encontrada');
+  var items = b.items || [];
+  readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(unitId); }).forEach(function (m) { deleteById('unit_materiales', m.id); });
+  items.forEach(function (it) {
+    if (!it.material) return;
+    append('unit_materiales', {
+      unit_id: unitId, material: it.material,
+      tiene: it.tiene ? 1 : 0, vencimiento: it.vencimiento || '', nota: it.nota || '',
+    });
+  });
+  return getUnitDetail(unitId);
+}
+
+function addPapeleta(user, unitId, b) {
+  if (!getById('units', unitId)) throw apiError(404, 'Unidad no encontrada');
+  if (!b.fecha) throw apiError(400, 'La fecha de la papeleta es requerida');
+  var fotoUrl = '';
+  if (b.file && b.file.dataBase64) fotoUrl = uploadGuia(b.file.dataBase64, b.file.name, b.file.mimeType);
+  append('unit_papeletas', {
+    unit_id: unitId, fecha: b.fecha, papeleta_num: b.papeleta_num || '', infraccion: b.infraccion || '',
+    monto: b.monto || '', estado: b.estado || 'pendiente', driver_id: b.driver_id || '',
+    foto_url: fotoUrl, created_by: user.email, created_at: nowISO(),
+  });
+  return getUnitDetail(unitId);
+}
+
+function updatePapeleta(unitId, papeletaId, b) {
+  var ex = getById('unit_papeletas', papeletaId);
+  if (!ex || String(ex.unit_id) !== String(unitId)) throw apiError(404, 'Papeleta no encontrada');
+  var patch = {};
+  if (b.fecha !== undefined) patch.fecha = b.fecha;
+  if (b.papeleta_num !== undefined) patch.papeleta_num = b.papeleta_num;
+  if (b.infraccion !== undefined) patch.infraccion = b.infraccion;
+  if (b.monto !== undefined) patch.monto = b.monto;
+  if (b.estado !== undefined) patch.estado = b.estado;
+  if (b.driver_id !== undefined) patch.driver_id = b.driver_id;
+  if (b.file && b.file.dataBase64) patch.foto_url = uploadGuia(b.file.dataBase64, b.file.name, b.file.mimeType);
+  updateById('unit_papeletas', papeletaId, patch);
+  return getUnitDetail(unitId);
+}
+
+function deletePapeleta(unitId, papeletaId) {
+  var ex = getById('unit_papeletas', papeletaId);
+  if (!ex || String(ex.unit_id) !== String(unitId)) throw apiError(404, 'Papeleta no encontrada');
+  deleteById('unit_papeletas', papeletaId);
+  return true;
+}
+
+function addKm(user, unitId, b) {
+  if (!getById('units', unitId)) throw apiError(404, 'Unidad no encontrada');
+  if (b.km === undefined || b.km === null || b.km === '') throw apiError(400, 'Indica el kilometraje');
+  append('unit_km', {
+    unit_id: unitId, fecha: b.fecha || todayISO(), km: b.km, nota: b.nota || '',
+    created_by: user.email, created_at: nowISO(),
+  });
+  return getUnitDetail(unitId);
+}
+
+function deleteKm(unitId, kmId) {
+  var ex = getById('unit_km', kmId);
+  if (!ex || String(ex.unit_id) !== String(unitId)) throw apiError(404, 'Registro de km no encontrado');
+  deleteById('unit_km', kmId);
+  return true;
 }
 
 function nowISO() { return new Date().toISOString(); }

@@ -121,4 +121,17 @@ export const api = {
   driverEntrega: (id, payload) => call(`/routes/${id}/entrega`, { method: 'POST', body: payload }),
   driverFotoElementos: (id, file) => call(`/routes/${id}/foto-elementos`, { method: 'POST', file }),
   driverGuia: (id, file) => call(`/routes/${id}/guia`, { method: 'POST', file }),
+
+  // ---- Flota (unidades moviles) ----
+  getUnits: () => call('/units'),
+  getUnit: (id) => call(`/units/${id}`),
+  createUnit: (payload) => call('/units', { method: 'POST', body: payload }),
+  updateUnit: (id, payload) => call(`/units/${id}`, { method: 'PUT', body: payload }),
+  deleteUnit: (id) => call(`/units/${id}`, { method: 'DELETE' }),
+  saveMateriales: (id, items) => call(`/units/${id}/materiales`, { method: 'POST', body: { items } }),
+  addPapeleta: (id, payload, file) => call(`/units/${id}/papeletas`, { method: 'POST', body: payload, file }),
+  updatePapeleta: (id, papeletaId, payload, file) => call(`/units/${id}/papeletas/${papeletaId}`, { method: 'PUT', body: payload, file }),
+  deletePapeleta: (id, papeletaId) => call(`/units/${id}/papeletas/${papeletaId}`, { method: 'DELETE' }),
+  addKm: (id, payload) => call(`/units/${id}/km`, { method: 'POST', body: payload }),
+  deleteKm: (id, kmId) => call(`/units/${id}/km/${kmId}`, { method: 'DELETE' }),
 };
