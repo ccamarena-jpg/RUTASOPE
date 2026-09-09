@@ -40,6 +40,8 @@ function fileToBase64(file) {
   });
 }
 
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
 async function call(path, { method = 'GET', body = null, query = null, file = null } = {}) {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL === 'PEGA_AQUI_LA_URL_DEL_WEB_APP') {
     throw new Error('Falta configurar la URL del Web App (VITE_APPS_SCRIPT_URL).');
@@ -50,50 +52,84 @@ async function call(path, { method = 'GET', body = null, query = null, file = nu
     const dataBase64 = await fileToBase64(file);
     envelope.body = { ...(body || {}), file: { name: file.name, mimeType: file.type || 'application/octet-stream', dataBase64 } };
   }
+  const payloadStr = JSON.stringify(envelope);
 
-  let res;
-  try {
-    res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(envelope),
-      redirect: 'follow',
-    });
-  } catch (e) {
-    throw new Error('No se pudo conectar con el servidor. Revisa la URL del Web App y tu conexion.');
-  }
+  // El backend (Apps Script) es intermitente: a veces responde rapido en JSON y a
+  // veces se cuelga varios segundos o devuelve HTML (cold start, contencion del
+  // Sheet, latencia de Google). Para las LECTURAS reintentamos automaticamente con
+  // timeout, asi un bache no le muestra el error al usuario. NO reintentamos
+  // escrituras (POST/PUT/DELETE) para no duplicar registros, y tampoco les
+  // ponemos timeout (una subida de foto/guia en 4G puede tardar).
+  const isRead = method === 'GET';
+  const maxAttempts = isRead ? 3 : 1;
+  const READ_TIMEOUT_MS = 20000;
+  let lastNetErr = null;
 
-  let payload = null;
-  try { payload = await res.json(); } catch (e) { /* respuesta no JSON */ }
-
-  if (!payload || payload.ok === false) {
-    const status = (payload && payload.status) || res.status;
-    // Sesion vencida o token invalido (p. ej. tras republicar el Apps Script o
-    // cambiar el JWT_SECRET). Antes esto fallaba en silencio y las listas
-    // (choferes, rutas...) quedaban vacias sin avisar. Ahora cerramos la sesion
-    // y volvemos al login para que el usuario reautentique. No aplica a /auth/*
-    // (un 401 ahi es simplemente credencial equivocada).
-    if (status === 401 && !path.startsWith('/auth/')) {
-      clearSession();
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.assign('/login');
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let res;
+    try {
+      let signal;
+      let timer = null;
+      if (isRead) {
+        const controller = new AbortController();
+        signal = controller.signal;
+        timer = setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
       }
+      try {
+        res = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: payloadStr,
+          redirect: 'follow',
+          signal,
+        });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    } catch (e) {
+      // Falla de red o timeout (fetch lanzo). En lecturas, reintenta antes de rendirse.
+      lastNetErr = new Error('No se pudo conectar con el servidor. Revisa la URL del Web App y tu conexion.');
+      if (isRead && attempt < maxAttempts) { await sleep(600 * attempt); continue; }
+      throw lastNetErr;
     }
-    // Respuesta sin JSON (payload nulo): normalmente el Web App de Apps Script
-    // respondio con HTML en vez de JSON (muro de login de Google, cuota agotada,
-    // o una implementacion caida/republicada). Antes esto lanzaba un confuso
-    // "Error 200" que se tragaba en silencio y dejaba las listas vacias sin
-    // motivo aparente ("se queda colgado"). Damos un mensaje claro y marcamos el
-    // error como problema de sesion para que la UI ofrezca reingresar.
-    const message = payload
-      ? (payload.error || `Error ${status}`)
-      : 'No se pudo leer la respuesta del servidor. Es probable que tu sesion haya vencido o que el backend se este reiniciando. Vuelve a iniciar sesion.';
-    const err = new Error(message);
-    err.status = status;
-    err.sessionLikely = !payload || status === 401;
-    throw err;
+
+    let payload = null;
+    try { payload = await res.json(); } catch (e) { /* respuesta no JSON */ }
+
+    if (!payload || payload.ok === false) {
+      const status = (payload && payload.status) || res.status;
+      // Sesion vencida o token invalido (p. ej. tras republicar el Apps Script o
+      // cambiar el JWT_SECRET). Antes esto fallaba en silencio y las listas
+      // (choferes, rutas...) quedaban vacias sin avisar. Ahora cerramos la sesion
+      // y volvemos al login para que el usuario reautentique. No aplica a /auth/*
+      // (un 401 ahi es simplemente credencial equivocada).
+      if (status === 401 && !path.startsWith('/auth/')) {
+        clearSession();
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.assign('/login');
+        }
+      }
+      // Respuesta sin JSON (payload nulo): normalmente el Web App respondio con
+      // HTML en vez de JSON (muro de login de Google, cuota, o backend colgado).
+      // Si es lectura y no es un 401, reintenta antes de mostrar el error.
+      if (!payload && status !== 401 && isRead && attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+      // Antes un payload nulo lanzaba un confuso "Error 200" que se tragaba en
+      // silencio y dejaba las listas vacias ("se queda colgado"). Damos un mensaje
+      // claro y marcamos el error como problema de sesion para que la UI reaccione.
+      const message = payload
+        ? (payload.error || `Error ${status}`)
+        : 'No se pudo leer la respuesta del servidor. Es probable que tu sesion haya vencido o que el backend se este reiniciando. Vuelve a iniciar sesion.';
+      const err = new Error(message);
+      err.status = status;
+      err.sessionLikely = !payload || status === 401;
+      throw err;
+    }
+    return payload.data;
   }
-  return payload.data;
+  throw lastNetErr || new Error('No se pudo completar la solicitud.');
 }
 
 export const api = {
