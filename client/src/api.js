@@ -79,8 +79,18 @@ async function call(path, { method = 'GET', body = null, query = null, file = nu
         window.location.assign('/login');
       }
     }
-    const err = new Error((payload && payload.error) || `Error ${status}`);
+    // Respuesta sin JSON (payload nulo): normalmente el Web App de Apps Script
+    // respondio con HTML en vez de JSON (muro de login de Google, cuota agotada,
+    // o una implementacion caida/republicada). Antes esto lanzaba un confuso
+    // "Error 200" que se tragaba en silencio y dejaba las listas vacias sin
+    // motivo aparente ("se queda colgado"). Damos un mensaje claro y marcamos el
+    // error como problema de sesion para que la UI ofrezca reingresar.
+    const message = payload
+      ? (payload.error || `Error ${status}`)
+      : 'No se pudo leer la respuesta del servidor. Es probable que tu sesion haya vencido o que el backend se este reiniciando. Vuelve a iniciar sesion.';
+    const err = new Error(message);
     err.status = status;
+    err.sessionLikely = !payload || status === 401;
     throw err;
   }
   return payload.data;

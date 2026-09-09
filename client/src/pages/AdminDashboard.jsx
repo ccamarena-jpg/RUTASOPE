@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { api } from '../api';
+import { api, clearSession } from '../api';
 import WeeklyCalendar from '../components/WeeklyCalendar.jsx';
 import RouteFormModal from '../components/RouteFormModal.jsx';
 import BulkUploadModal from '../components/BulkUploadModal.jsx';
@@ -26,10 +26,18 @@ export default function AdminDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [catalogUnlocked, setCatalogUnlocked] = useState(sessionStorage.getItem('ruteo_catalog_ok') === '1');
+  const [catalogError, setCatalogError] = useState(null);
 
   const refreshCatalog = useCallback(() => {
-    api.getDrivers().then(setDrivers).catch(() => {});
-    api.getAccounts().then(setAccounts).catch(() => {});
+    setCatalogError(null);
+    // Antes cada carga hacia catch(()=>{}) y, si fallaba (sesion vencida, backend
+    // caido, etc.), el combo de choferes quedaba vacio sin ningun aviso. Ahora si
+    // algo falla lo mostramos en un banner con acciones para reintentar o
+    // reingresar, en vez de dejar la pantalla "colgada".
+    Promise.all([
+      api.getDrivers().then(setDrivers),
+      api.getAccounts().then(setAccounts),
+    ]).catch((e) => setCatalogError(e && e.message ? e.message : 'No se pudieron cargar los datos.'));
   }, []);
 
   useEffect(() => { refreshCatalog(); }, [refreshCatalog]);
@@ -45,6 +53,15 @@ export default function AdminDashboard() {
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
       </div>
+      {catalogError && (
+        <div className="error-msg" style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 12 }}>
+          <span>{catalogError}</span>
+          <span style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={refreshCatalog}>Reintentar</button>
+            <button className="btn" onClick={() => { clearSession(); window.location.assign('/login'); }}>Volver a iniciar sesion</button>
+          </span>
+        </div>
+      )}
       {tab === 'dashboard' && <DashboardTab />}
       {tab === 'calendar' && <CalendarTab drivers={drivers} accounts={accounts} />}
       {tab === 'month' && <MonthlyCalendar />}
