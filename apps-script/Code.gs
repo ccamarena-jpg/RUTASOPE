@@ -112,21 +112,34 @@ function handle(env) {
 
   if (seg[0] === 'drivers') {
     if (seg.length === 1 && method === 'GET') {
+      var cachedD = cacheGetArr('cat_drivers');
+      if (cachedD) return cachedD;
       var ds = readAll('drivers').filter(function (d) { return d.active !== 0; });
       ds.sort(byName);
+      // El combo no usa last_lat/lng; la ubicacion en vivo va por /locations. Por
+      // eso es seguro cachear esta lista aunque traiga posicion algo vieja.
+      cachePutArr('cat_drivers', ds);
       return ds;
     }
-    if (seg.length === 1 && method === 'POST') { requireRole(user, ['admin']); return createDriver(body); }
-    if (seg.length === 2 && method === 'PUT') { requireRole(user, ['admin']); return updateDriver(seg[1], body); }
-    if (seg.length === 2 && method === 'DELETE') { requireRole(user, ['admin']); deleteById('drivers', seg[1]); return { ok: true }; }
+    if (seg.length === 1 && method === 'POST') { requireRole(user, ['admin']); bustCache('cat_drivers'); return createDriver(body); }
+    if (seg.length === 2 && method === 'PUT') { requireRole(user, ['admin']); bustCache('cat_drivers'); return updateDriver(seg[1], body); }
+    if (seg.length === 2 && method === 'DELETE') { requireRole(user, ['admin']); deleteById('drivers', seg[1]); bustCache('cat_drivers'); return { ok: true }; }
   }
 
   if (seg[0] === 'accounts') {
-    if (seg.length === 1 && method === 'GET') { var as = readAll('accounts'); as.sort(byName); return as; }
+    if (seg.length === 1 && method === 'GET') {
+      var cachedA = cacheGetArr('cat_accounts');
+      if (cachedA) return cachedA;
+      var as = readAll('accounts'); as.sort(byName);
+      cachePutArr('cat_accounts', as);
+      return as;
+    }
     if (seg.length === 1 && method === 'POST') {
       requireRole(user, ['admin']);
       if (!body.name) throw apiError(400, 'Nombre requerido');
-      return append('accounts', { name: body.name });
+      var newAccount = append('accounts', { name: body.name });
+      bustCache('cat_accounts');
+      return newAccount;
     }
   }
 
@@ -337,8 +350,52 @@ function readAll(tab) {
     .filter(function (o) { return o.id !== null && o.id !== ''; });
 }
 
+// ---- Cache de catalogos (CacheService) ----
+// El catalogo de choferes/cuentas se lee en cada carga del panel y del combo. El
+// Sheet es lento e intermitente (cold start, contencion), asi que guardamos la
+// ultima lista en memoria unos minutos: sale en milisegundos y un bache del Sheet
+// deja de vaciar el combo. Se invalida (bustCache) al crear/editar/borrar. OJO: NO
+// cachear /locations (ubicacion en vivo, cambia cada 60s) — usa readAll siempre.
+var CATALOG_TTL = 120; // segundos
+function cacheGetArr(key) {
+  try { var s = CacheService.getScriptCache().get(key); return s ? JSON.parse(s) : null; } catch (e) { return null; }
+}
+function cachePutArr(key, arr) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(arr), CATALOG_TTL); } catch (e) { /* >100KB o sin acceso */ }
+}
+function bustCache(key) {
+  try { CacheService.getScriptCache().remove(key); } catch (e) { /* noop */ }
+}
+
+// Borra varias filas por id en UNA sola pasada, de abajo hacia arriba (para no
+// recalcular indices). Reemplaza el patron caro de deleteById por cada fila hija,
+// que hacia una lectura de columna + un deleteRow con lock POR CADA fila.
+function deleteRowsByIds(tab, ids) {
+  if (!ids || !ids.length) return 0;
+  var wanted = {};
+  ids.forEach(function (x) { wanted[String(x)] = true; });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sheet(tab), last = sh.getLastRow();
+    if (last < 2) return 0;
+    var idCol = sh.getRange(2, 1, last - 1, 1).getValues();
+    var rows = [];
+    for (var i = 0; i < idCol.length; i++) if (wanted[String(idCol[i][0])]) rows.push(i + 2);
+    rows.sort(function (a, b) { return b - a; });
+    for (var j = 0; j < rows.length; j++) sh.deleteRow(rows[j]);
+    return rows.length;
+  } finally { lock.releaseLock(); }
+}
+
 function nextId(tab) {
-  return readAll(tab).reduce(function (m, r) { return Math.max(m, Number(r.id) || 0); }, 0) + 1;
+  // Solo la columna de IDs, no la hoja entera (antes hacia un readAll completo
+  // en CADA creacion solo para sacar el maximo id).
+  var sh = sheet(tab), last = sh.getLastRow();
+  if (last < 2) return 1;
+  var ids = sh.getRange(2, 1, last - 1, 1).getValues();
+  var max = 0;
+  for (var i = 0; i < ids.length; i++) { var n = Number(ids[i][0]) || 0; if (n > max) max = n; }
+  return max + 1;
 }
 
 function findRowNumber(tab, id) {
@@ -373,11 +430,16 @@ function getById(tab, id) {
 function updateById(tab, id, patch) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    var rowNum = findRowNumber(tab, id);
+    var sh = sheet(tab);
+    var rowNum = findRowNumber(tab, id); // lee solo la columna de IDs
     if (rowNum === null) return null;
-    var current = getById(tab, id);
+    // Antes: getById() hacia un readAll COMPLETO de la tabla solo para traer esta
+    // fila. Ahora leemos unicamente la fila objetivo. Clave para saveLocation, que
+    // corre cada 60s por chofer sobre la tabla drivers.
+    var cols = SCHEMA[tab];
+    var current = rowToObj(tab, sh.getRange(rowNum, 1, 1, cols.length).getValues()[0]);
     var merged = Object.assign({}, current, patch, { id: current.id });
-    setRow(sheet(tab), rowNum, objToRow(tab, merged));
+    setRow(sh, rowNum, objToRow(tab, merged));
     return rowToObj(tab, objToRow(tab, merged));
   } finally { lock.releaseLock(); }
 }
@@ -756,10 +818,16 @@ function updateUnit(id, b) {
 }
 
 function deleteUnit(id) {
-  // Cascada: borra materiales, papeletas y kilometraje de la unidad.
-  readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(id); }).forEach(function (m) { deleteById('unit_materiales', m.id); });
-  readAll('unit_papeletas').filter(function (p) { return String(p.unit_id) === String(id); }).forEach(function (p) { deleteById('unit_papeletas', p.id); });
-  readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); }).forEach(function (k) { deleteById('unit_km', k.id); });
+  // Cascada: borra materiales, papeletas y kilometraje de la unidad. Antes hacia
+  // un readAll completo + un deleteById (lectura de columna + deleteRow + lock) por
+  // CADA fila hija — eso disparaba los timeouts. Ahora lee cada tabla una vez y
+  // borra todas sus filas en un solo lote.
+  var mats = readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(id); }).map(function (m) { return m.id; });
+  var paps = readAll('unit_papeletas').filter(function (p) { return String(p.unit_id) === String(id); }).map(function (p) { return p.id; });
+  var kms = readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); }).map(function (k) { return k.id; });
+  deleteRowsByIds('unit_materiales', mats);
+  deleteRowsByIds('unit_papeletas', paps);
+  deleteRowsByIds('unit_km', kms);
   deleteById('units', id);
   return true;
 }
@@ -768,7 +836,8 @@ function deleteUnit(id) {
 function saveMateriales(unitId, b) {
   if (!getById('units', unitId)) throw apiError(404, 'Unidad no encontrada');
   var items = b.items || [];
-  readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(unitId); }).forEach(function (m) { deleteById('unit_materiales', m.id); });
+  var oldIds = readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(unitId); }).map(function (m) { return m.id; });
+  deleteRowsByIds('unit_materiales', oldIds);
   items.forEach(function (it) {
     if (!it.material) return;
     append('unit_materiales', {
