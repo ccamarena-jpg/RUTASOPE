@@ -39,6 +39,10 @@ var SCHEMA = {
   drivers: ['id', 'name', 'phone', 'vehicle', 'supervisor', 'active', 'last_lat', 'last_lng', 'last_loc_at', 'es_proveedor'],
   accounts: ['id', 'name'],
   projects: ['id', 'name', 'account_id'],
+  // Ubicacion en vivo, UNA fila por chofer (clave: driver_id). Vive aparte del
+  // catalogo (drivers) para que las escrituras cada 60s NO ensucien el catalogo
+  // ni invaliden su cache. La escribe saveLocation; la lee listLocations.
+  driver_locations: ['driver_id', 'lat', 'lng', 'updated_at'],
   routes: [
     'id', 'date', 'hour', 'driver_id', 'account_id', 'project_id', 'destino', 'motivo',
     'status', 'hora_salida', 'hora_llegada', 'comentario_chofer', 'motivo_no_realizada',
@@ -509,17 +513,51 @@ function updateUserLink(id, b) {
   return publicUser(rec);
 }
 
-// Ubicacion en tiempo real: el chofer guarda su posicion en su registro de chofer.
+// Ubicacion en tiempo real: se guarda en driver_locations (una fila por chofer),
+// NO en el catalogo drivers. Asi la escritura cada 60s no toca el catalogo ni su
+// cache. Upsert por driver_id: actualiza su fila o la crea si no existe.
+function upsertLocation(driverId, lat, lng, updatedAt) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sheet('driver_locations');
+    var last = sh.getLastRow();
+    var rowNum = null;
+    if (last >= 2) {
+      var ids = sh.getRange(2, 1, last - 1, 1).getValues(); // solo columna driver_id
+      for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(driverId)) { rowNum = i + 2; break; }
+    }
+    var target = rowNum || Math.max(last + 1, 2);
+    var rng = sh.getRange(target, 1, 1, SCHEMA.driver_locations.length);
+    rng.setNumberFormat('@');
+    rng.setValues([[String(driverId), String(lat), String(lng), updatedAt || nowISO()]]);
+    return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+
+function locationsByDriver() {
+  var m = {};
+  readAll('driver_locations').forEach(function (r) { m[String(r.driver_id)] = r; });
+  return m;
+}
+
 function saveLocation(user, b) {
   if (!user.driver_id) throw apiError(400, 'Tu usuario no tiene un chofer vinculado');
   if (b.lat === undefined || b.lat === null || b.lng === undefined || b.lng === null) throw apiError(400, 'Faltan coordenadas');
-  updateById('drivers', user.driver_id, { last_lat: b.lat, last_lng: b.lng, last_loc_at: nowISO() });
+  upsertLocation(user.driver_id, b.lat, b.lng);
   return { ok: true };
 }
-// Admin/responsables leen la ultima posicion de cada chofer activo.
+// Admin/responsables leen la ultima posicion de cada chofer activo. Cruza el
+// catalogo (drivers) con la tabla de ubicaciones (driver_locations).
 function listLocations() {
+  var locs = locationsByDriver();
   return readAll('drivers').filter(function (d) { return d.active !== 0; }).map(function (d) {
-    return { driver_id: d.id, name: d.name, vehicle: d.vehicle, lat: d.last_lat, lng: d.last_lng, updated_at: d.last_loc_at };
+    var l = locs[String(d.id)] || {};
+    return {
+      driver_id: d.id, name: d.name, vehicle: d.vehicle,
+      lat: (l.lat === undefined ? '' : l.lat),
+      lng: (l.lng === undefined ? '' : l.lng),
+      updated_at: l.updated_at || '',
+    };
   });
 }
 
@@ -916,6 +954,22 @@ function setup() {
   });
   seedIfEmpty();
   return 'Setup completo. Personal entra con Google; chofer cris@ttaudit.com / Cris';
+}
+
+// Migracion de una sola vez: copia la ultima ubicacion que hoy vive en el catalogo
+// (drivers.last_lat/last_lng/last_loc_at) a la pestana nueva driver_locations, para
+// que el mapa en vivo no quede en blanco tras separar la ubicacion. Corre setup()
+// primero (crea la pestana) y luego esto. Es seguro re-ejecutarla (upsert por
+// chofer). Despues de migrar, las columnas last_* de drivers quedan sin uso.
+function migrateLocations() {
+  var n = 0;
+  readAll('drivers').forEach(function (d) {
+    if (d.last_lat !== null && d.last_lat !== '' && d.last_lng !== null && d.last_lng !== '') {
+      upsertLocation(d.id, d.last_lat, d.last_lng, d.last_loc_at || '');
+      n++;
+    }
+  });
+  return 'Ubicaciones migradas a driver_locations: ' + n;
 }
 
 // Aplica userDirectory() sobre la hoja aunque ya tenga datos: agrega los usuarios
