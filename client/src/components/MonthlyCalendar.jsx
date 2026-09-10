@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { api } from '../api';
 import { toISODate, getMonday, addDays } from '../utils/date';
+import { useCachedResource } from '../utils/useCachedResource';
 
 const DOW = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'];
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -9,19 +10,19 @@ const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado:
 export default function MonthlyCalendar() {
   const today = new Date();
   const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
-  const [routes, setRoutes] = useState([]);
   const [selected, setSelected] = useState(null);
 
   const gridStart = getMonday(month);
   const days = useMemo(() => Array.from({ length: 42 }, (_, i) => addDays(gridStart, i)), [month]);
 
-  const load = useCallback(() => {
-    const from = toISODate(gridStart);
-    const to = toISODate(addDays(gridStart, 41));
-    api.getRoutes({ from, to }).then(setRoutes).catch(() => setRoutes([]));
-  }, [month]);
-
-  useEffect(() => { load(); }, [load]);
+  const from = toISODate(gridStart);
+  const to = toISODate(addDays(gridStart, 41));
+  // Cache SWR por mes: cambiar de vista y volver ya no recarga la grilla en blanco.
+  const { data: routes = [] } = useCachedResource(
+    `routes:range:${from}:${to}`,
+    () => api.getRoutes({ from, to }),
+    { initialData: [] },
+  );
 
   const byDay = useMemo(() => {
     const map = {};

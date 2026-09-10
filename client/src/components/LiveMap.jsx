@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { loadGoogleMaps, MAPS_KEY } from '../utils/gmaps';
+import { useCachedResource } from '../utils/useCachedResource';
 
 const LIMA = { lat: -12.0464, lng: -77.0428 };
 
@@ -15,7 +16,6 @@ export default function LiveMap() {
   const markers = useRef({});
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
-  const [locs, setLocs] = useState([]);
   const [lastRefresh, setLastRefresh] = useState(null);
 
   useEffect(() => {
@@ -29,13 +29,15 @@ export default function LiveMap() {
     return () => { cancelled = true; };
   }, []);
 
-  const load = useCallback(() => {
-    api.getLocations().then((d) => { setLocs(d); setLastRefresh(new Date()); }).catch((e) => setError(e.message));
-  }, []);
-
+  // Cache SWR: al volver al Mapa muestra las ultimas posiciones al instante y
+  // revalida; ademas auto-refresca cada 30s mientras la vista este montada.
+  const { data: locs = [], error: locsError, revalidate: load } = useCachedResource(
+    'locations', () => api.getLocations(), { initialData: [] },
+  );
+  useEffect(() => { if (locsError) setError(locsError.message || 'No se pudieron cargar las ubicaciones.'); }, [locsError]);
+  useEffect(() => { if (locs && locs.length) setLastRefresh(new Date()); }, [locs]);
   useEffect(() => {
-    load();
-    const id = setInterval(load, 30000);
+    const id = setInterval(() => load(), 30000);
     return () => clearInterval(id);
   }, [load]);
 

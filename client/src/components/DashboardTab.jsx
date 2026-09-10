@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { api } from '../api';
 import { getMonday, addDays, toISODate, formatShort } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
+import { useCachedResource } from '../utils/useCachedResource';
 
 const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado: 'Completado', no_realizada: 'No realizada' };
 
@@ -41,18 +42,15 @@ function Bars({ data, color = 'var(--navy)' }) {
 export default function DashboardTab() {
   const [from, setFrom] = useState(toISODate(getMonday(new Date())));
   const [to, setTo] = useState(toISODate(addDays(getMonday(new Date()), 6)));
-  const [routes, setRoutes] = useState([]);
-  const [drivers, setDrivers] = useState([]);
   const [driverFilter, setDriverFilter] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    api.getRoutes({ from, to }).then(setRoutes).catch(() => setRoutes([])).finally(() => setLoading(false));
-  }, [from, to]);
-
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { api.getDrivers().then(setDrivers).catch(() => {}); }, []);
+  // Cache SWR: al volver al Dashboard muestra los datos al instante y revalida.
+  const { data: routes = [], loading } = useCachedResource(
+    `routes:range:${from}:${to}`,
+    () => api.getRoutes({ from, to }),
+    { initialData: [] },
+  );
+  const { data: drivers = [] } = useCachedResource('drivers', () => api.getDrivers(), { initialData: [] });
 
   const shown = useMemo(() => (driverFilter ? routes.filter((r) => Number(r.driver_id) === Number(driverFilter)) : routes), [routes, driverFilter]);
 

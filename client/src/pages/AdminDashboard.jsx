@@ -10,6 +10,7 @@ import StatusSummary from '../components/StatusSummary.jsx';
 import UnitsPanel from '../components/UnitsPanel.jsx';
 import { getMonday, addDays, toISODate } from '../utils/date';
 import { downloadRoutesCsv } from '../utils/csv';
+import { useCachedResource, invalidate, invalidatePrefix } from '../utils/useCachedResource';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -46,6 +47,9 @@ export default function AdminDashboard() {
 
   const refreshCatalog = useCallback(() => {
     setCatalogError(null);
+    // Invalida el cache compartido para que otras pestanas (Dashboard, Unidades)
+    // revaliden choferes/cuentas tras un cambio en el catalogo.
+    invalidate('drivers'); invalidate('accounts'); invalidate('units');
     // Antes cada carga hacia catch(()=>{}) y, si fallaba (sesion vencida, backend
     // caido, etc.), el combo de choferes quedaba vacio sin ningun aviso. Ahora si
     // algo falla lo mostramos en un banner con acciones para reintentar o
@@ -98,7 +102,6 @@ export default function AdminDashboard() {
 function CalendarTab({ drivers, accounts }) {
   const [weekStart, setWeekStart] = useState(getMonday(new Date()));
   const [driverId, setDriverId] = useState(null);
-  const [routes, setRoutes] = useState([]);
   const [modalState, setModalState] = useState(null); // { initial }
   const [showBulk, setShowBulk] = useState(false);
 
@@ -106,14 +109,19 @@ function CalendarTab({ drivers, accounts }) {
     if (!driverId && drivers.length) setDriverId(drivers[0].id);
   }, [drivers, driverId]);
 
-  const load = useCallback(() => {
-    if (!driverId) return;
-    const from = toISODate(weekStart);
-    const to = toISODate(addDays(weekStart, 6));
-    api.getRoutes({ from, to, driver_id: driverId }).then(setRoutes).catch(() => {});
-  }, [driverId, weekStart]);
+  const from = toISODate(weekStart);
+  const to = toISODate(addDays(weekStart, 6));
+  // Cache SWR por chofer+semana: cambiar de pestana y volver ya no deja la grilla
+  // en blanco ni vuelve a esperar al backend; muestra lo ultimo y revalida.
+  const { data: routes = [], revalidate: load } = useCachedResource(
+    driverId ? `routes:week:${driverId}:${from}` : null,
+    () => api.getRoutes({ from, to, driver_id: driverId }),
+    { initialData: [] },
+  );
 
-  useEffect(() => { load(); }, [load]);
+  // Tras crear/editar/borrar rutas: limpia el cache de TODAS las vistas de rutas
+  // (Dashboard, Mensual, Hoy, otras semanas) y recarga la actual.
+  const reloadRoutes = useCallback(() => { invalidatePrefix('routes:'); load(); }, [load]);
 
   const driverMeta = useMemo(() => drivers.find((d) => d.id === driverId), [drivers, driverId]);
 
@@ -135,6 +143,7 @@ function CalendarTab({ drivers, accounts }) {
           tipo_movimiento: r.tipo_movimiento || '', elementos_trasladados: r.elementos_trasladados || '', costo_transporte: r.costo_transporte || '',
         });
       }
+      invalidatePrefix('routes:');
       setWeekStart(addDays(weekStart, 7));
     } catch (e) { alert('Error al copiar: ' + e.message); } finally { setCopiando(false); }
   }
@@ -165,11 +174,11 @@ function CalendarTab({ drivers, accounts }) {
           drivers={drivers}
           accounts={accounts}
           onClose={() => setModalState(null)}
-          onSaved={() => { setModalState(null); load(); }}
-          onDeleted={() => { setModalState(null); load(); }}
+          onSaved={() => { setModalState(null); reloadRoutes(); }}
+          onDeleted={() => { setModalState(null); reloadRoutes(); }}
         />
       )}
-      {showBulk && <BulkUploadModal onClose={() => setShowBulk(false)} onDone={load} />}
+      {showBulk && <BulkUploadModal onClose={() => setShowBulk(false)} onDone={reloadRoutes} />}
     </div>
   );
 }
@@ -178,20 +187,25 @@ const STATUS_LABEL = { pendiente: 'Pendiente', en_curso: 'En curso', completado:
 
 function TodayTab() {
   const [date, setDate] = useState(toISODate(new Date()));
-  const [routes, setRoutes] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [search, setSearch] = useState('');
   const [driverFilter, setDriverFilter] = useState('todos');
   const [accountFilter, setAccountFilter] = useState('todos');
   const [statusFilter, setStatusFilter] = useState('todos');
 
-  const load = useCallback(() => {
-    api.getRoutes({ date }).then((r) => { setRoutes(r); setLastUpdated(new Date()); }).catch(() => {});
-  }, [date]);
+  // Cache SWR por fecha: al volver a esta vista muestra las rutas al instante.
+  const { data: routes = [], revalidate: load } = useCachedResource(
+    `routes:today:${date}`,
+    () => api.getRoutes({ date }),
+    { initialData: [] },
+  );
 
+  // "Ultima actualizacion" se refresca cada vez que llegan rutas frescas.
+  useEffect(() => { setLastUpdated(new Date()); }, [routes]);
+
+  // Auto-refresco en vivo cada 15s mientras la vista este montada.
   useEffect(() => {
-    load();
-    const id = setInterval(load, 15000);
+    const id = setInterval(() => load(), 15000);
     return () => clearInterval(id);
   }, [load]);
 

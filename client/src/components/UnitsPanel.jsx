@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { toISODate } from '../utils/date';
+import { useCachedResource } from '../utils/useCachedResource';
 
 // ====== Semaforo de fechas / km ======
 // Umbral en dias para marcar "por vencer".
@@ -63,17 +64,16 @@ const ESTADO_LABEL = { activa: 'Activa', inactiva: 'Inactiva', taller: 'En talle
 
 // ====== Vista principal ======
 export default function UnitsPanel() {
-  const [units, setUnits] = useState([]);
-  const [drivers, setDrivers] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [error, setError] = useState('');
 
-  const load = useCallback(() => {
-    api.getUnits().then(setUnits).catch((e) => setError(e.message));
-  }, []);
-
-  useEffect(() => { load(); api.getDrivers().then(setDrivers).catch(() => {}); }, [load]);
+  // Cache SWR: la lista de unidades y el catalogo de choferes ya no se recargan en
+  // blanco al entrar/salir de esta pestana.
+  const { data: units = [], error: unitsError, revalidate: load } = useCachedResource(
+    'units', () => api.getUnits(), { initialData: [] },
+  );
+  const { data: drivers = [] } = useCachedResource('drivers', () => api.getDrivers(), { initialData: [] });
+  const error = unitsError ? (unitsError.message || 'No se pudieron cargar las unidades.') : '';
 
   if (selectedId) {
     return (
