@@ -1,0 +1,5 @@
+# Patrones relativos a rootDir (apps-script). Solo subimos el codigo del backend y
+# el manifiesto; el resto (README, etc.) se queda fuera del push.
+**/**
+!Code.gs
+!appsscript.json

@@ -43,7 +43,8 @@ aplicación web. Es gratis.
 
 > Cada vez que edites el código, entra a **Implementar → Gestionar
 > implementaciones**, edita la existente (lápiz) y sube la versión a **Nueva
-> versión**. Así la URL **no cambia**.
+> versión**. Así la URL **no cambia**. (O usa clasp: `npm run gas:redeploy`, ver
+> [Despliegue automatizado con clasp](#despliegue-automatizado-con-clasp-recomendado).)
 
 ### 4b. Iniciar sesión con Google (para el personal TT Audit)
 
@@ -82,6 +83,60 @@ Para desarrollo local, crea `client/.env.local` con:
 ```
 VITE_APPS_SCRIPT_URL=https://script.google.com/macros/s/XXXX/exec
 ```
+
+## Despliegue automatizado con clasp (recomendado)
+
+En vez de copiar/pegar el `Code.gs` a mano cada vez, puedes publicar desde la
+terminal con [clasp](https://github.com/google/clasp). Los comandos ya están en
+el `package.json` de la raíz (usan `npx`, no hace falta instalar nada global).
+
+### Configuración (una sola vez)
+
+1. **Activa la Apps Script API** para tu cuenta en
+   https://script.google.com/home/usersettings (interruptor **On**).
+2. **Inicia sesión** con tu cuenta de Google (abre el navegador):
+   ```bash
+   npm run gas:login
+   ```
+   Esto guarda tus credenciales en `~/.clasprc.json` (fuera del repo, ya está en
+   `.gitignore`). Este paso es **tuyo**: Claude no puede hacer el login por ti.
+3. **Pega el Script ID** en [`.clasp.json`](../.clasp.json) (raíz del repo),
+   reemplazando `PEGA_AQUI_EL_SCRIPT_ID`. Lo encuentras en el editor de Apps
+   Script: **Configuración del proyecto (⚙) → ID de la secuencia de comandos**.
+   > Ojo: el *Script ID* NO es el mismo que el *Deployment ID* (el `AKfycb...` de
+   > la URL `/exec`). El Deployment ID ya está fijado en el script `gas:deploy`
+   > para que la URL **nunca cambie**.
+
+### Día a día
+
+```bash
+npm run gas:redeploy
+```
+
+Eso hace `gas:push` (sube `Code.gs` + `appsscript.json`) y luego `gas:deploy`,
+que actualiza **la misma implementación** (mismo Deployment ID → **misma URL
+`/exec`**, sin invalidar sesiones). Reemplaza todo el flujo manual de "pegar +
+Gestionar implementaciones → Versión nueva".
+
+Otros comandos: `npm run gas:push` (solo subir, sin publicar), `npm run
+gas:deployments` (listar implementaciones/IDs), `npm run gas:open` (abrir el
+editor).
+
+### Qué NO cubre clasp
+- **Correr funciones** como `setup()` o `migrateLocations()` sigue siendo manual
+  desde el editor (solo hace falta al **agregar pestañas nuevas** al `SCHEMA`,
+  algo poco frecuente). `clasp run` existe pero requiere un proyecto de Google
+  Cloud propio; no vale la pena para este uso.
+- Si cambiaste el manifiesto (`appsscript.json`) y difiere del remoto, el primer
+  `gas:push` te preguntará si sobrescribir. El de este repo ya refleja la config
+  actual (zona Lima, V8, Web App: *Cualquier persona* / *Ejecutar como yo*).
+
+### Verificar que quedó bien
+Tras desplegar, confirma que el `/exec` responde JSON (no HTML):
+```bash
+curl -sL -X POST "https://script.google.com/macros/s/AKfycbwiCJ3CIMNpXWEAA8eIzbH4gjBKIKSDif-55NkBK0t2yiDq245m4J3YbLEiLuJg25mE/exec" -H "Content-Type: text/plain" --data '{"path":"/drivers","method":"GET","token":"","query":{},"body":{}}'
+```
+Debe devolver `{"ok":false,"status":401,"error":"No autenticado"}` = backend sano.
 
 ## Usuarios (creados por `setup` / `syncUsers`)
 

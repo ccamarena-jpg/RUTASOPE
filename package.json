@@ -4,7 +4,14 @@
   "private": true,
   "description": "Ruteo TT Audit - frontend estatico (React/Vite) con backend en Google Apps Script + Google Sheets/Drive",
   "scripts": {
-    "build": "cd client && npm install && npm run build"
+    "build": "cd client && npm install && npm run build",
+    "gas:login": "npx --yes @google/clasp@2.4.2 login",
+    "gas:pull": "npx --yes @google/clasp@2.4.2 pull",
+    "gas:push": "npx --yes @google/clasp@2.4.2 push",
+    "gas:deploy": "npx --yes @google/clasp@2.4.2 deploy -i AKfycbwiCJ3CIMNpXWEAA8eIzbH4gjBKIKSDif-55NkBK0t2yiDq245m4J3YbLEiLuJg25mE -d \"deploy via clasp\"",
+    "gas:redeploy": "npm run gas:push && npm run gas:deploy",
+    "gas:deployments": "npx --yes @google/clasp@2.4.2 deployments",
+    "gas:open": "npx --yes @google/clasp@2.4.2 open"
   },
   "engines": {
     "node": ">=18"
