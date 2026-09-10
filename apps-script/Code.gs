@@ -66,8 +66,11 @@ var SCHEMA = {
   unit_papeletas: ['id', 'unit_id', 'fecha', 'papeleta_num', 'infraccion', 'monto', 'estado', 'driver_id', 'foto_url', 'created_by', 'created_at'],
   // Historial de kilometraje (lecturas de odometro).
   unit_km: ['id', 'unit_id', 'fecha', 'km', 'nota', 'created_by', 'created_at'],
+  // Historial de mantenimiento por unidad (importado del taller). km_servicio =
+  // km planeado del servicio (5000, 10000, ...). Solo lectura por ahora.
+  unit_mantenimiento: ['id', 'unit_id', 'taller', 'km_ingreso', 'km_servicio', 'fecha_ingreso', 'fecha_salida', 'descripcion', 'created_at'],
 };
-var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1, unit_id: 1, anio: 1, km: 1, km_ultimo_mant: 1, km_intervalo_mant: 1, monto: 1, tiene: 1 };
+var NUMERIC = { id: 1, driver_id: 1, account_id: 1, project_id: 1, active: 1, last_lat: 1, last_lng: 1, lat: 1, lng: 1, es_proveedor: 1, costo_transporte: 1, costo_proveedor: 1, unit_id: 1, anio: 1, km: 1, km_ultimo_mant: 1, km_intervalo_mant: 1, monto: 1, tiene: 1, km_ingreso: 1, km_servicio: 1 };
 
 // Materiales obligatorios que se crean por defecto al registrar una unidad.
 var DEFAULT_MATERIALES = ['Extintor', 'Botiquin', 'Cono de seguridad', 'Gata', 'Llanta de repuesto', 'Triangulos de seguridad', 'Chaleco reflectivo', 'Llave de ruedas'];
@@ -813,7 +816,9 @@ function getUnitDetail(id) {
   papeletas.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
   var km = readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); });
   km.sort(function (a, b) { return String(b.fecha).localeCompare(String(a.fecha)); });
-  return { unit: enrichUnit(unit, driversById), materiales: materiales, papeletas: papeletas, km: km };
+  var mantenimiento = readAll('unit_mantenimiento').filter(function (m) { return String(m.unit_id) === String(id); });
+  mantenimiento.sort(function (a, b) { return String(b.fecha_ingreso).localeCompare(String(a.fecha_ingreso)); });
+  return { unit: enrichUnit(unit, driversById), materiales: materiales, papeletas: papeletas, km: km, mantenimiento: mantenimiento };
 }
 
 function unitPatchFromBody(b, ex) {
@@ -863,9 +868,11 @@ function deleteUnit(id) {
   var mats = readAll('unit_materiales').filter(function (m) { return String(m.unit_id) === String(id); }).map(function (m) { return m.id; });
   var paps = readAll('unit_papeletas').filter(function (p) { return String(p.unit_id) === String(id); }).map(function (p) { return p.id; });
   var kms = readAll('unit_km').filter(function (k) { return String(k.unit_id) === String(id); }).map(function (k) { return k.id; });
+  var mants = readAll('unit_mantenimiento').filter(function (m) { return String(m.unit_id) === String(id); }).map(function (m) { return m.id; });
   deleteRowsByIds('unit_materiales', mats);
   deleteRowsByIds('unit_papeletas', paps);
   deleteRowsByIds('unit_km', kms);
+  deleteRowsByIds('unit_mantenimiento', mants);
   deleteById('units', id);
   return true;
 }
@@ -1007,6 +1014,145 @@ function seedUnitsDocumentos() {
     added++;
   });
   return 'Unidades cargadas. Agregadas: ' + added + '. Ya existian (saltadas): ' + skipped + '. Total ahora: ' + readAll('units').length + '.';
+}
+
+// Carga el historial de mantenimiento (importado del taller) en unit_mantenimiento,
+// cruzando por placa con las unidades en base. Idempotente: salta duplicados
+// (misma unidad + fecha_ingreso + km_ingreso) y placas sin unidad. Escritura en
+// lote (una sola setValues). Ejecutar UNA vez desde el editor.
+function seedMantenimiento() {
+  // Placa(s) a excluir de la carga.
+  var EXCLUIR = { 'CSC436': 1 };
+  var DATA = [
+    {"placa": "BYW700", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 6060, "km_servicio": 5000, "fecha_ingreso": "2024-08-07", "fecha_salida": "2024-08-07", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "BYW700", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10526, "km_servicio": 10000, "fecha_ingreso": "2024-11-09", "fecha_salida": "2024-11-09", "descripcion": "MP 10000"},
+    {"placa": "BYW700", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 18463, "km_servicio": 15000, "fecha_ingreso": "2025-02-03", "fecha_salida": "2025-02-03", "descripcion": "MANTTO PREVENTIVO 15K"},
+    {"placa": "BYW700", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 23940, "km_servicio": 20000, "fecha_ingreso": "2025-04-08", "fecha_salida": "2025-04-08", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 29311, "km_servicio": 30000, "fecha_ingreso": "2025-06-20", "fecha_salida": "2025-06-20", "descripcion": ""},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 34772, "km_servicio": 35000, "fecha_ingreso": "2025-09-03", "fecha_salida": "2025-09-03", "descripcion": ""},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 40638, "km_servicio": 40000, "fecha_ingreso": "2025-11-13", "fecha_salida": "2025-11-14", "descripcion": ""},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 46809, "km_servicio": 45000, "fecha_ingreso": "2026-02-03", "fecha_salida": "2026-02-03", "descripcion": ""},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 52534, "km_servicio": 50000, "fecha_ingreso": "2026-04-13", "fecha_salida": "2026-04-13", "descripcion": ""},
+    {"placa": "BYW700", "taller": "RENTING S.A.C.", "km_ingreso": 57914, "km_servicio": 55000, "fecha_ingreso": "2026-07-01", "fecha_salida": "2026-07-02", "descripcion": ""},
+    {"placa": "BYW716", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 6041, "km_servicio": 5000, "fecha_ingreso": "2024-07-25", "fecha_salida": "2024-07-25", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "BYW716", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 11200, "km_servicio": 10000, "fecha_ingreso": "2024-10-02", "fecha_salida": "2024-10-02", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "BYW716", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 16123, "km_servicio": 15000, "fecha_ingreso": "2024-11-23", "fecha_salida": "2024-11-23", "descripcion": "MP 15000"},
+    {"placa": "BYW716", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 24442, "km_servicio": 25000, "fecha_ingreso": "2025-02-24", "fecha_salida": "2025-02-24", "descripcion": "SERVICIO MP 25000"},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 29853, "km_servicio": 30000, "fecha_ingreso": "2025-04-14", "fecha_salida": "2025-04-14", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 35929, "km_servicio": 35000, "fecha_ingreso": "2025-07-03", "fecha_salida": "2025-07-03", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 41789, "km_servicio": 40000, "fecha_ingreso": "2025-09-04", "fecha_salida": "2025-09-04", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 47806, "km_servicio": 45000, "fecha_ingreso": "2025-11-14", "fecha_salida": "2025-11-17", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 53587, "km_servicio": 50000, "fecha_ingreso": "2026-01-30", "fecha_salida": "2026-02-02", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 58637, "km_servicio": 55000, "fecha_ingreso": "2026-04-10", "fecha_salida": "2026-04-10", "descripcion": ""},
+    {"placa": "BYW716", "taller": "RENTING S.A.C.", "km_ingreso": 63397, "km_servicio": 60000, "fecha_ingreso": "2026-07-02", "fecha_salida": "2026-07-02", "descripcion": ""},
+    {"placa": "BYW754", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 5488, "km_servicio": 5000, "fecha_ingreso": "2024-07-22", "fecha_salida": "2024-07-22", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "BYW754", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10547, "km_servicio": 10000, "fecha_ingreso": "2024-11-18", "fecha_salida": "2024-11-18", "descripcion": "MP 10000"},
+    {"placa": "BYW754", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 16272, "km_servicio": 15000, "fecha_ingreso": "2025-04-22", "fecha_salida": "2025-04-22", "descripcion": "Servicio MP de 15000 km"},
+    {"placa": "BYW754", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 21918, "km_servicio": 20000, "fecha_ingreso": "2025-06-23", "fecha_salida": "2025-06-24", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "BYW754", "taller": "RENTING S.A.C.", "km_ingreso": 27574, "km_servicio": 25000, "fecha_ingreso": "2025-08-08", "fecha_salida": "2025-08-08", "descripcion": ""},
+    {"placa": "BYW754", "taller": "RENTING S.A.C.", "km_ingreso": 33133, "km_servicio": 30000, "fecha_ingreso": "2025-12-16", "fecha_salida": "2025-12-17", "descripcion": ""},
+    {"placa": "BYW754", "taller": "RENTING S.A.C.", "km_ingreso": 38728, "km_servicio": 35000, "fecha_ingreso": "2026-02-02", "fecha_salida": "2026-02-03", "descripcion": ""},
+    {"placa": "BYW754", "taller": "RENTING S.A.C.", "km_ingreso": 44028, "km_servicio": 40000, "fecha_ingreso": "2026-03-25", "fecha_salida": "2026-03-25", "descripcion": ""},
+    {"placa": "BYW754", "taller": "RENTING S.A.C.", "km_ingreso": 49271, "km_servicio": 50000, "fecha_ingreso": "2026-05-22", "fecha_salida": "2026-05-23", "descripcion": ""},
+    {"placa": "CBT824", "taller": "AUTONIZA S.A.C", "km_ingreso": 6415, "km_servicio": 5000, "fecha_ingreso": "2025-07-15", "fecha_salida": "2025-07-16", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CBT824", "taller": "AUTONIZA S.A.C", "km_ingreso": 13407, "km_servicio": 10000, "fecha_ingreso": "2025-09-18", "fecha_salida": "2025-09-18", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CBT824", "taller": "SUR MOTRIZ SOCIEDAD COMERCIALDE RESPONSABILIDAD LIMITADA- SURMOTRIZS.R.L.", "km_ingreso": 24121, "km_servicio": 25000, "fecha_ingreso": "2026-01-12", "fecha_salida": "2026-01-12", "descripcion": "Servicio MP de 25000 km"},
+    {"placa": "CBT824", "taller": "RENTING S.A.C.", "km_ingreso": 29891, "km_servicio": 30000, "fecha_ingreso": "2026-03-05", "fecha_salida": "", "descripcion": "Servicio de 30000 Km"},
+    {"placa": "CBU722", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 8341, "km_servicio": 5000, "fecha_ingreso": "2025-04-04", "fecha_salida": "2025-04-04", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CBU722", "taller": "AUTONIZA S.A.C", "km_ingreso": 15117, "km_servicio": 10000, "fecha_ingreso": "2025-07-04", "fecha_salida": "2025-07-04", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CBU722", "taller": "AUTONIZA S.A.C", "km_ingreso": 15117, "km_servicio": 15117, "fecha_ingreso": "2025-07-04", "fecha_salida": "2025-07-04", "descripcion": "Unidad presenta pastillas delanteras gastadas Cliente asume el cambio"},
+    {"placa": "CBU722", "taller": "RENTING S.A.C.", "km_ingreso": 21139, "km_servicio": 20000, "fecha_ingreso": "2025-11-24", "fecha_salida": "2025-11-25", "descripcion": ""},
+    {"placa": "CBU722", "taller": "RENTING S.A.C.", "km_ingreso": 27491, "km_servicio": 25000, "fecha_ingreso": "2026-02-05", "fecha_salida": "2026-02-09", "descripcion": ""},
+    {"placa": "CBU722", "taller": "RENTING S.A.C.", "km_ingreso": 42269, "km_servicio": 40000, "fecha_ingreso": "2026-06-18", "fecha_salida": "2026-06-18", "descripcion": ""},
+    {"placa": "CBZ888", "taller": "AUTONIZA S.A.C", "km_ingreso": 5334, "km_servicio": 5000, "fecha_ingreso": "2025-03-25", "fecha_salida": "2025-03-25", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CBZ888", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10846, "km_servicio": 10000, "fecha_ingreso": "2025-06-10", "fecha_salida": "2025-06-10", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CBZ888", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 15547, "km_servicio": 15000, "fecha_ingreso": "2025-08-08", "fecha_salida": "2025-08-08", "descripcion": "Servicio MP de 15000 km"},
+    {"placa": "CBZ888", "taller": "RENTING S.A.C.", "km_ingreso": 21677, "km_servicio": 20000, "fecha_ingreso": "2025-11-06", "fecha_salida": "2025-11-07", "descripcion": ""},
+    {"placa": "CBZ888", "taller": "RENTING S.A.C.", "km_ingreso": 27068, "km_servicio": 25000, "fecha_ingreso": "2026-01-20", "fecha_salida": "2026-01-21", "descripcion": ""},
+    {"placa": "CBZ888", "taller": "RENTING S.A.C.", "km_ingreso": 32893, "km_servicio": 30000, "fecha_ingreso": "2026-03-23", "fecha_salida": "2026-03-24", "descripcion": ""},
+    {"placa": "CBZ888", "taller": "RENTING S.A.C.", "km_ingreso": 38088, "km_servicio": 35000, "fecha_ingreso": "2026-06-04", "fecha_salida": "2026-06-05", "descripcion": ""},
+    {"placa": "CDC549", "taller": "GRUPO PANA S.A.", "km_ingreso": 5631, "km_servicio": 5000, "fecha_ingreso": "2023-04-15", "fecha_salida": "2023-04-15", "descripcion": "MANTENIMIENTO PREVENTIVO"},
+    {"placa": "CDC549", "taller": "GRUPO PANA S.A.", "km_ingreso": 5432, "km_servicio": 5000, "fecha_ingreso": "2023-05-27", "fecha_salida": "2023-05-27", "descripcion": "MANTENIMIENTO PREVENTIVO"},
+    {"placa": "CDC549", "taller": "GRUPO PANA S.A.", "km_ingreso": 15999, "km_servicio": 15000, "fecha_ingreso": "2023-07-22", "fecha_salida": "2023-07-22", "descripcion": "MANTENIMIENTO PREVENTIVO"},
+    {"placa": "CDC549", "taller": "GRUPO PANA S.A.", "km_ingreso": 20783, "km_servicio": 20000, "fecha_ingreso": "2023-09-26", "fecha_salida": "2023-09-26", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "CDC549", "taller": "GRUPO PANA S.A.", "km_ingreso": 26243, "km_servicio": 25000, "fecha_ingreso": "2023-11-13", "fecha_salida": "2023-11-13", "descripcion": "Servicio MP de 25000 km"},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 31108, "km_servicio": 30000, "fecha_ingreso": "2024-01-13", "fecha_salida": "2024-01-15", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 36064, "km_servicio": 35000, "fecha_ingreso": "2024-04-08", "fecha_salida": "2024-04-10", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 39711, "km_servicio": 40000, "fecha_ingreso": "2024-05-31", "fecha_salida": "2024-06-03", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 45082, "km_servicio": 45000, "fecha_ingreso": "2024-08-15", "fecha_salida": "2024-08-19", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 50016, "km_servicio": 50000, "fecha_ingreso": "2024-10-18", "fecha_salida": "2024-10-21", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 55176, "km_servicio": 55000, "fecha_ingreso": "2025-01-03", "fecha_salida": "2025-01-07", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 60245, "km_servicio": 60000, "fecha_ingreso": "2025-03-07", "fecha_salida": "2025-03-10", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 65298, "km_servicio": 65000, "fecha_ingreso": "2025-05-16", "fecha_salida": "2025-05-19", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 70380, "km_servicio": 70000, "fecha_ingreso": "2025-07-19", "fecha_salida": "2025-07-21", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 75000, "km_servicio": 74714, "fecha_ingreso": "2025-09-19", "fecha_salida": "2025-09-19", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 79974, "km_servicio": 80000, "fecha_ingreso": "2025-11-18", "fecha_salida": "2025-11-21", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 86869, "km_servicio": 85000, "fecha_ingreso": "2026-02-13", "fecha_salida": "2026-02-16", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 93713, "km_servicio": 90000, "fecha_ingreso": "2026-05-19", "fecha_salida": "2026-05-19", "descripcion": ""},
+    {"placa": "CDC549", "taller": "RENTING S.A.C.", "km_ingreso": 99631, "km_servicio": 100000, "fecha_ingreso": "2026-07-27", "fecha_salida": "2026-07-27", "descripcion": ""},
+    {"placa": "CDD114", "taller": "GRUPO PANA S.A.", "km_ingreso": 5096, "km_servicio": 5000, "fecha_ingreso": "2023-05-22", "fecha_salida": "2023-05-22", "descripcion": "MANTENIMIENTO PREVENTIVO"},
+    {"placa": "CDD114", "taller": "GRUPO PANA S.A.", "km_ingreso": 10398, "km_servicio": 10000, "fecha_ingreso": "2023-08-16", "fecha_salida": "2023-08-16", "descripcion": "MANTENIMIENTO PREVENTIVO"},
+    {"placa": "CDD114", "taller": "GRUPO PANA S.A.", "km_ingreso": 15600, "km_servicio": 15000, "fecha_ingreso": "2023-11-27", "fecha_salida": "2023-11-27", "descripcion": "Servicio MP de 15000 km"},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 21269, "km_servicio": 25000, "fecha_ingreso": "2024-02-15", "fecha_salida": "2024-02-15", "descripcion": ""},
+    {"placa": "CDD114", "taller": "GRUPO PANA S.A.", "km_ingreso": 21027, "km_servicio": 20000, "fecha_ingreso": "2024-02-27", "fecha_salida": "2024-02-27", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 26552, "km_servicio": 25000, "fecha_ingreso": "2024-04-26", "fecha_salida": "2024-04-26", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 30931, "km_servicio": 30000, "fecha_ingreso": "2024-07-30", "fecha_salida": "2024-07-30", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 36005, "km_servicio": 35000, "fecha_ingreso": "2024-10-18", "fecha_salida": "2024-10-21", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 41239, "km_servicio": 40000, "fecha_ingreso": "2025-01-02", "fecha_salida": "2025-01-03", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 47211, "km_servicio": 47000, "fecha_ingreso": "2025-03-17", "fecha_salida": "2025-03-17", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 52470, "km_servicio": 50000, "fecha_ingreso": "2025-05-22", "fecha_salida": "2025-05-22", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 57566, "km_servicio": 55000, "fecha_ingreso": "2025-09-02", "fecha_salida": "2025-09-03", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 63142, "km_servicio": 60000, "fecha_ingreso": "2025-11-21", "fecha_salida": "2025-11-24", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 68653, "km_servicio": 65000, "fecha_ingreso": "2026-01-19", "fecha_salida": "2026-01-20", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 74018, "km_servicio": 75000, "fecha_ingreso": "2026-03-14", "fecha_salida": "2026-04-06", "descripcion": ""},
+    {"placa": "CDD114", "taller": "RENTING S.A.C.", "km_ingreso": 79656, "km_servicio": 80000, "fecha_ingreso": "2026-05-18", "fecha_salida": "2026-05-18", "descripcion": ""},
+    {"placa": "CDD114", "taller": "PINEDA AUTOMOTRIZ S.A.C.", "km_ingreso": 86642, "km_servicio": 85000, "fecha_ingreso": "2026-08-04", "fecha_salida": "2026-08-04", "descripcion": "MANTTO PREVENTIVO 85K"},
+    {"placa": "CFM760", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 6165, "km_servicio": 5000, "fecha_ingreso": "2025-11-17", "fecha_salida": "2025-11-17", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CFM760", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10468, "km_servicio": 10000, "fecha_ingreso": "2026-01-07", "fecha_salida": "2026-01-07", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CFM760", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 15489, "km_servicio": 15000, "fecha_ingreso": "2026-02-20", "fecha_salida": "2026-02-20", "descripcion": "Servicio MP de 15000 km"},
+    {"placa": "CFM760", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 20767, "km_servicio": 20000, "fecha_ingreso": "2026-03-11", "fecha_salida": "2026-03-11", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "CFM760", "taller": "RENTING S.A.C.", "km_ingreso": 26062, "km_servicio": 25000, "fecha_ingreso": "2026-05-25", "fecha_salida": "2026-05-25", "descripcion": ""},
+    {"placa": "CFM760", "taller": "RENTING S.A.C.", "km_ingreso": 32317, "km_servicio": 30000, "fecha_ingreso": "2026-08-26", "fecha_salida": "2026-08-26", "descripcion": ""},
+    {"placa": "CFM856", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 5232, "km_servicio": 5000, "fecha_ingreso": "2025-11-11", "fecha_salida": "2025-11-11", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CFM856", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10594, "km_servicio": 10000, "fecha_ingreso": "2026-05-15", "fecha_salida": "2026-05-15", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CFO709", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 6238, "km_servicio": 5000, "fecha_ingreso": "2025-11-12", "fecha_salida": "2025-11-12", "descripcion": "Servicio MP de 5000 km"},
+    {"placa": "CFO709", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 10238, "km_servicio": 10000, "fecha_ingreso": "2026-01-21", "fecha_salida": "2026-01-21", "descripcion": "Servicio MP de 10000 km"},
+    {"placa": "CFO709", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 15351, "km_servicio": 15000, "fecha_ingreso": "2026-03-12", "fecha_salida": "2026-03-12", "descripcion": "Servicio MP de 15000 km"},
+    {"placa": "CFO709", "taller": "GACSA PERÚ S.A.C.", "km_ingreso": 20575, "km_servicio": 20000, "fecha_ingreso": "2026-05-26", "fecha_salida": "2026-05-26", "descripcion": "Servicio MP de 20000 km"},
+    {"placa": "CFO709", "taller": "RENTING S.A.C.", "km_ingreso": 26094, "km_servicio": 25000, "fecha_ingreso": "2026-07-30", "fecha_salida": "2026-08-04", "descripcion": ""},
+    {"placa": "CSC436", "taller": "EUROSHOP S.A.", "km_ingreso": 10525, "km_servicio": 10000, "fecha_ingreso": "2026-02-21", "fecha_salida": "2026-02-21", "descripcion": "Servicio MP de 10000 km"}
+  ];
+  var unitByPlaca = {};
+  readAll('units').forEach(function (u) { unitByPlaca[String(u.placa).trim().toUpperCase()] = u.id; });
+  var seen = {};
+  readAll('unit_mantenimiento').forEach(function (m) { seen[m.unit_id + '|' + m.fecha_ingreso + '|' + m.km_ingreso] = true; });
+  var id = nextId('unit_mantenimiento');
+  var toWrite = [], added = 0, sinUnidad = 0, dup = 0, excl = 0;
+  DATA.forEach(function (r) {
+    var key = String(r.placa).trim().toUpperCase();
+    if (EXCLUIR[key]) { excl++; return; }
+    var uid = unitByPlaca[key];
+    if (!uid) { sinUnidad++; return; }
+    var dk = uid + '|' + r.fecha_ingreso + '|' + r.km_ingreso;
+    if (seen[dk]) { dup++; return; }
+    seen[dk] = true;
+    toWrite.push(objToRow('unit_mantenimiento', {
+      id: id++, unit_id: uid, taller: r.taller, km_ingreso: r.km_ingreso, km_servicio: r.km_servicio,
+      fecha_ingreso: r.fecha_ingreso, fecha_salida: r.fecha_salida, descripcion: r.descripcion, created_at: nowISO(),
+    }));
+    added++;
+  });
+  if (toWrite.length) {
+    var lock = LockService.getScriptLock(); lock.waitLock(30000);
+    try {
+      var sh = sheet('unit_mantenimiento');
+      var start = Math.max(sh.getLastRow() + 1, 2);
+      var rng = sh.getRange(start, 1, toWrite.length, SCHEMA.unit_mantenimiento.length);
+      rng.setNumberFormat('@');
+      rng.setValues(toWrite);
+    } finally { lock.releaseLock(); }
+  }
+  return 'Mantenimiento cargado. Agregados: ' + added + '. Sin unidad en base: ' + sinUnidad + '. Duplicados saltados: ' + dup + '. Excluidos: ' + excl + '.';
 }
 
 // Aplica userDirectory() sobre la hoja aunque ya tenga datos: agrega los usuarios

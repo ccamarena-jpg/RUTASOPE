@@ -208,6 +208,7 @@ function UnitDetail({ unitId, drivers, onBack }) {
       <MaterialesCard unitId={unitId} materiales={data.materiales} onSaved={load} />
       <PapeletasCard unitId={unitId} papeletas={data.papeletas} drivers={drivers} onChanged={load} />
       <KmCard unitId={unitId} km={data.km} unit={u} onChanged={load} />
+      <MantenimientoCard mantenimiento={data.mantenimiento} />
 
       {showEdit && (
         <UnitFormModal
@@ -475,6 +476,40 @@ function KmCard({ unitId, km, unit, onChanged }) {
             ))}
           </tbody>
         </table>
+      )}
+    </div>
+  );
+}
+
+// ====== Historial de mantenimiento (solo lectura, importado del taller) ======
+function MantenimientoCard({ mantenimiento }) {
+  const items = mantenimiento || [];
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h3>🔧 Historial de mantenimiento</h3>
+        {items.length > 0 && <span style={{ fontSize: 12, color: 'var(--text-soft)' }}>{items.length} servicios</span>}
+      </div>
+      {items.length === 0 ? (
+        <div className="empty-state" style={{ padding: '20px 0' }}>Sin historial de mantenimiento.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table className="simple">
+            <thead><tr><th>Ingreso</th><th>Salida</th><th>Km</th><th>Servicio (km)</th><th>Taller</th><th>Descripción</th></tr></thead>
+            <tbody>
+              {items.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.fecha_ingreso ? String(m.fecha_ingreso).slice(0, 10) : '—'}</td>
+                  <td>{m.fecha_salida ? String(m.fecha_salida).slice(0, 10) : '—'}</td>
+                  <td>{m.km_ingreso !== '' && m.km_ingreso != null ? Number(m.km_ingreso).toLocaleString('es-PE') : '—'}</td>
+                  <td>{m.km_servicio !== '' && m.km_servicio != null ? Number(m.km_servicio).toLocaleString('es-PE') : '—'}</td>
+                  <td style={{ fontSize: 12.5 }}>{m.taller || '—'}</td>
+                  <td style={{ fontSize: 12.5 }}>{m.descripcion || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
