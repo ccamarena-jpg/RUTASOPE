@@ -972,6 +972,43 @@ function migrateLocations() {
   return 'Ubicaciones migradas a driver_locations: ' + n;
 }
 
+// Carga inicial de la flota desde "Detalles de documentos.xlsx" (12 unidades),
+// asignadas por numero de placa. Idempotente: salta las placas que ya existan, y
+// a cada unidad nueva le siembra el checklist de materiales por defecto (igual que
+// createUnit). Ejecutar UNA vez desde el editor. Mapeo: SOAT<-F.fin SOAT,
+// Poliza<-F.Fin Poliza, Mant. Eurorenting<-F.Fin Contrato, Rev. tecnica MTC<-Permiso
+// MTC Vigencia (solo APLICA); el resto (contrato/companias/permiso) va en notas.
+function seedUnitsDocumentos() {
+  var DATA = [
+    {"placa": "CDD114", "marca": "TOYOTA", "modelo": "ETIOS 1.5", "soat_venc": "2027-01-06", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-01-18", "rtv_venc": "", "notas": "Contrato Eurorenting: 2023-01-18 a 2028-01-18. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CDC549", "marca": "TOYOTA", "modelo": "ETIOS 1.5", "soat_venc": "2027-01-06", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-01-18", "rtv_venc": "", "notas": "Contrato Eurorenting: 2023-01-18 a 2028-01-18. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "BYW700", "marca": "CHEVROLET", "modelo": "N400", "soat_venc": "2027-04-02", "poliza_venc": "2026-08-31", "mant_euro_venc": "2027-05-02", "rtv_venc": "2027-04-25", "notas": "Contrato Eurorenting: 2024-05-02 a 2027-05-02. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: APLICA."},
+    {"placa": "BYW716", "marca": "CHEVROLET", "modelo": "N400", "soat_venc": "2027-04-02", "poliza_venc": "2026-08-31", "mant_euro_venc": "2027-05-02", "rtv_venc": "2027-04-25", "notas": "Contrato Eurorenting: 2024-05-02 a 2027-05-02. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: APLICA."},
+    {"placa": "BYW754", "marca": "CHEVROLET", "modelo": "N400", "soat_venc": "2027-04-02", "poliza_venc": "2026-08-31", "mant_euro_venc": "2027-05-04", "rtv_venc": "2027-04-25", "notas": "Contrato Eurorenting: 2024-05-04 a 2027-05-04. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: APLICA."},
+    {"placa": "CBU722", "marca": "CHEVROLET", "modelo": "N400 CARGO BASE", "soat_venc": "2026-12-12", "poliza_venc": "2026-08-31", "mant_euro_venc": "2026-09-03", "rtv_venc": "", "notas": "Contrato Eurorenting: 2026-07-30 a 2026-09-03. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CBT824", "marca": "CHEVROLET", "modelo": "N400 CARGO BASE", "soat_venc": "2026-12-12", "poliza_venc": "2026-08-31", "mant_euro_venc": "2026-09-21", "rtv_venc": "", "notas": "Contrato Eurorenting: 2026-03-02 a 2026-09-21. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CBZ888", "marca": "CHEVROLET", "modelo": "N400 CARGO", "soat_venc": "2027-01-02", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-01-14", "rtv_venc": "2028-02-01", "notas": "Contrato Eurorenting: 2025-01-14 a 2028-01-14. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: APLICA."},
+    {"placa": "CSC436", "marca": "VOLKSWAGEN", "modelo": "POLO HIGHLINE 1.6", "soat_venc": "2027-04-03", "poliza_venc": "2026-08-31", "mant_euro_venc": "2030-04-08", "rtv_venc": "", "notas": "Contrato Eurorenting: 2025-04-08 a 2030-04-08. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CFM760", "marca": "CHEVROLET", "modelo": "N400 MAX 1.5 CARGO FULL", "soat_venc": "2026-08-27", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-09-05", "rtv_venc": "", "notas": "Contrato Eurorenting: 2025-09-05 a 2028-09-05. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CFM856", "marca": "CHEVROLET", "modelo": "N400 MAX 1.5 CARGO FULL", "soat_venc": "2026-08-28", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-09-05", "rtv_venc": "", "notas": "Contrato Eurorenting: 2025-09-05 a 2028-09-05. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."},
+    {"placa": "CFO709", "marca": "CHEVROLET", "modelo": "N400 MAX 1.5 CARGO FULL", "soat_venc": "2026-09-02", "poliza_venc": "2026-08-31", "mant_euro_venc": "2028-09-05", "rtv_venc": "", "notas": "Contrato Eurorenting: 2025-09-05 a 2028-09-05. Poliza: RIMAC Todo riesgo. SOAT: RIMAC. Permiso MTC: NO APLICA."}
+  ];
+  var existing = {};
+  readAll('units').forEach(function (u) { existing[String(u.placa).trim().toUpperCase()] = true; });
+  var added = 0, skipped = 0;
+  DATA.forEach(function (row) {
+    var key = String(row.placa).trim().toUpperCase();
+    if (existing[key]) { skipped++; return; }
+    var rec = append('units', unitPatchFromBody(row, {}));
+    DEFAULT_MATERIALES.forEach(function (name) {
+      append('unit_materiales', { unit_id: rec.id, material: name, tiene: 1, vencimiento: '', nota: '' });
+    });
+    existing[key] = true;
+    added++;
+  });
+  return 'Unidades cargadas. Agregadas: ' + added + '. Ya existian (saltadas): ' + skipped + '. Total ahora: ' + readAll('units').length + '.';
+}
+
 // Aplica userDirectory() sobre la hoja aunque ya tenga datos: agrega los usuarios
 // que falten (por correo) y actualiza nombre/rol/chofer de los existentes. Al
 // chofer nuevo le crea su registro en "drivers" si no existe. No borra usuarios
