@@ -1124,8 +1124,11 @@ function seedMantenimiento() {
   ];
   var unitByPlaca = {};
   readAll('units').forEach(function (u) { unitByPlaca[String(u.placa).trim().toUpperCase()] = u.id; });
+  // Clave anti-duplicados: incluye km_servicio + descripcion para no colapsar dos
+  // eventos distintos de la misma unidad el mismo dia y km (p. ej. CBU722 2025-07-04).
+  function dedupKey(uid, r) { return uid + '|' + r.fecha_ingreso + '|' + r.km_ingreso + '|' + r.km_servicio + '|' + r.descripcion; }
   var seen = {};
-  readAll('unit_mantenimiento').forEach(function (m) { seen[m.unit_id + '|' + m.fecha_ingreso + '|' + m.km_ingreso] = true; });
+  readAll('unit_mantenimiento').forEach(function (m) { seen[dedupKey(m.unit_id, m)] = true; });
   var id = nextId('unit_mantenimiento');
   var toWrite = [], added = 0, sinUnidad = 0, dup = 0, excl = 0;
   DATA.forEach(function (r) {
@@ -1133,7 +1136,7 @@ function seedMantenimiento() {
     if (EXCLUIR[key]) { excl++; return; }
     var uid = unitByPlaca[key];
     if (!uid) { sinUnidad++; return; }
-    var dk = uid + '|' + r.fecha_ingreso + '|' + r.km_ingreso;
+    var dk = dedupKey(uid, r);
     if (seen[dk]) { dup++; return; }
     seen[dk] = true;
     toWrite.push(objToRow('unit_mantenimiento', {
