@@ -21,10 +21,26 @@ const TABS = [
   { id: 'catalog', label: 'Choferes / Cuentas / Proyectos' },
 ];
 
+// Cache de catalogos (choferes/cuentas) en localStorage. El backend (Apps Script)
+// es intermitente: ante un bache (cold start, HTML, timeout) las lecturas fallan y
+// el combo de choferes quedaba en blanco = "se cuelga". Guardando la ultima lista
+// buena podemos sembrar los combos al instante y mantenerlos poblados aunque una
+// recarga falle, en vez de dejar la pantalla vacia.
+function loadCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const v = raw ? JSON.parse(raw) : null;
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+function saveCache(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value || [])); } catch (e) { /* cuota/priv */ }
+}
+
 export default function AdminDashboard() {
   const [tab, setTab] = useState('dashboard');
-  const [drivers, setDrivers] = useState([]);
-  const [accounts, setAccounts] = useState([]);
+  const [drivers, setDrivers] = useState(() => loadCache('ruteo_cache_drivers'));
+  const [accounts, setAccounts] = useState(() => loadCache('ruteo_cache_accounts'));
   const [catalogUnlocked, setCatalogUnlocked] = useState(sessionStorage.getItem('ruteo_catalog_ok') === '1');
   const [catalogError, setCatalogError] = useState(null);
 
@@ -33,10 +49,12 @@ export default function AdminDashboard() {
     // Antes cada carga hacia catch(()=>{}) y, si fallaba (sesion vencida, backend
     // caido, etc.), el combo de choferes quedaba vacio sin ningun aviso. Ahora si
     // algo falla lo mostramos en un banner con acciones para reintentar o
-    // reingresar, en vez de dejar la pantalla "colgada".
+    // reingresar, en vez de dejar la pantalla "colgada". Ademas cacheamos cada
+    // lista buena para que un bache del backend no deje los combos en blanco: si
+    // la recarga falla seguimos mostrando el ultimo catalogo conocido + el banner.
     Promise.all([
-      api.getDrivers().then(setDrivers),
-      api.getAccounts().then(setAccounts),
+      api.getDrivers().then((d) => { setDrivers(d); saveCache('ruteo_cache_drivers', d); }),
+      api.getAccounts().then((a) => { setAccounts(a); saveCache('ruteo_cache_accounts', a); }),
     ]).catch((e) => setCatalogError(e && e.message ? e.message : 'No se pudieron cargar los datos.'));
   }, []);
 
